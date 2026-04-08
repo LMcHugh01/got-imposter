@@ -72,7 +72,6 @@ export const useGameStore = create((set, get) => ({
     set((state) => ({
       round: state.round + 1,
       phase: 'voting',
-      lastEliminatedId: null,
     })),
 
   // Reset

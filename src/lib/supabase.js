@@ -46,12 +46,19 @@ export const fallbackCharacters = {
   ],
 }
 
+const difficultyMap = {
+  easy: ['easy'],
+  medium: ['easy', 'medium'],
+  hard: ['easy', 'medium', 'hard'],
+}
+
 export async function fetchRandomCharacter(difficulty) {
+  const levels = difficultyMap[difficulty]
   try {
     const { data, error } = await supabase
       .from('characters')
       .select('*')
-      .eq('difficulty', difficulty)
+      .in('difficulty', levels)
 
     if (error || !data || data.length === 0) {
       throw new Error('Supabase fetch failed or empty')
@@ -60,8 +67,8 @@ export async function fetchRandomCharacter(difficulty) {
     const random = Math.floor(Math.random() * data.length)
     return data[random]
   } catch {
-    // Fallback to local data
-    const chars = fallbackCharacters[difficulty]
+    // Fallback to local data (cumulative)
+    const chars = levels.flatMap((level) => fallbackCharacters[level])
     const random = Math.floor(Math.random() * chars.length)
     return chars[random]
   }

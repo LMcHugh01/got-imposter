@@ -188,14 +188,16 @@ function ImpostorCard() {
 export default function CardReveal() {
   const navigate = useNavigate()
   const { players, secretCharacter, currentRevealIndex, advanceReveal } = useGameStore()
-  const [isFlipped, setIsFlipped] = useState(false)
+  // 'initial' = face-down, 'revealed' = face-up, 'hidden' = face-down after hide
+  const [cardState, setCardState] = useState('initial')
 
   const currentPlayer = players[currentRevealIndex]
   const isLastPlayer = currentRevealIndex === players.length - 1
+  const isFlipped = cardState === 'revealed'
 
-  // Reset flip state when player changes
+  // Reset card state when player changes
   useEffect(() => {
-    setIsFlipped(false)
+    setCardState('initial')
   }, [currentRevealIndex])
 
   if (!currentPlayer || !secretCharacter) {
@@ -203,8 +205,8 @@ export default function CardReveal() {
     return null
   }
 
-  const handleReveal = () => setIsFlipped(true)
-  const handleHide = () => setIsFlipped(false)
+  const handleReveal = () => setCardState('revealed')
+  const handleHide = () => setCardState('hidden')
 
   const handleNext = () => {
     if (isLastPlayer) {
@@ -255,7 +257,7 @@ export default function CardReveal() {
 
         {/* Action buttons */}
         <AnimatePresence mode="wait">
-          {!isFlipped ? (
+          {cardState === 'initial' && (
             <motion.button
               key="reveal"
               initial={{ opacity: 0, y: 8 }}
@@ -268,29 +270,34 @@ export default function CardReveal() {
             >
               Reveal Card
             </motion.button>
-          ) : (
-            <motion.div
-              key="actions"
+          )}
+          {cardState === 'revealed' && (
+            <motion.button
+              key="hide"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              className="w-full flex flex-col gap-3"
+              whileTap={{ scale: 0.97 }}
+              onClick={handleHide}
+              className="w-full py-3 rounded border border-stone-700 text-stone-400 text-base tracking-widest uppercase transition-all hover:border-stone-500 hover:text-stone-300"
+              style={{ fontFamily: 'Cinzel, serif' }}
             >
-              <button
-                onClick={handleHide}
-                className="w-full py-3 rounded border border-stone-700 text-stone-400 text-base tracking-widest uppercase transition-all hover:border-stone-500 hover:text-stone-300"
-                style={{ fontFamily: 'Cinzel, serif' }}
-              >
-                Hide Card
-              </button>
-              <button
-                onClick={handleNext}
-                className="w-full py-5 rounded border border-got-gold bg-got-gold/10 text-got-gold text-xl tracking-widest uppercase transition-all hover:bg-got-gold/20"
-                style={{ fontFamily: 'Cinzel, serif' }}
-              >
-                {isLastPlayer ? "Everyone's Ready" : 'Next Player →'}
-              </button>
-            </motion.div>
+              Hide Card
+            </motion.button>
+          )}
+          {cardState === 'hidden' && (
+            <motion.button
+              key="next"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={handleNext}
+              className="w-full py-5 rounded border border-got-gold bg-got-gold/10 text-got-gold text-xl tracking-widest uppercase transition-all hover:bg-got-gold/20"
+              style={{ fontFamily: 'Cinzel, serif' }}
+            >
+              {isLastPlayer ? "Everyone's Ready" : 'Next Player →'}
+            </motion.button>
           )}
         </AnimatePresence>
 

@@ -92,18 +92,17 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ### 2. Settings (`/settings`)
 - Number of players: stepper input (2–20)
 - Number of impostors: stepper input (1 to half of players max)
-- Difficulty: Easy / Medium / Hard toggle
+- Difficulty: Easy / Medium / Hard toggle (cumulative — Medium includes Easy pool; Hard includes all)
 - "Start Game" button → fetches a random character from Supabase matching difficulty, assigns impostors randomly, navigates to Card Reveal
 
 ### 3. Card Reveal (`/reveal`)
 - Shows: *"Player [N] — Keep this secret!"*
 - Large card (face down by default)
-- **Reveal** button → card flips (Framer Motion flip animation) showing either:
-  - Character name + image (for loyalists)
-  - A special "Impostor" card with a distinct design (no character shown)
-- **Hide** button → flips card back face down
-- **Next Player** button → advances to next player
-- After all players have seen their card → "Everyone's ready!" → navigates to Voting
+- Strictly enforced 3-step flow per player:
+  1. **Reveal Card** → card flips to show character or Impostor card
+  2. **Hide Card** → card flips back face-down (only button shown while revealed)
+  3. **Next Player** → only appears after card is hidden; updates content while face-down (no peek possible)
+- After all players have seen their card → "Everyone's Ready" → navigates to Voting
 
 ### 4. Voting (`/voting`)
 - Shows current round number
@@ -113,9 +112,11 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 ### 5. Elimination Reveal (`/elimination`)
 - Dramatic reveal of whether the eliminated player was the Impostor or not
-- **If Impostor** → navigate to Results (Loyalists win)
-- **If Not Impostor** → mark player as eliminated, show "Not the Impostor!" message, button to go back to Voting for next round
-- Win condition also checked here: if only 2 players remain and impostor is still in → Impostor wins → navigate to Results
+- Win condition checked after every elimination:
+  - All impostors eliminated → Loyalists win → navigate to `/results`
+  - Impostors >= remaining loyalists → Impostor wins → navigate to `/results`
+  - Otherwise → increment round, continue to `/voting`
+- `lastEliminatedId` is NOT cleared on round advance (prevents guard mis-navigation to home)
 
 ### 6. Results (`/results`)
 - Shows who won: Loyalists or the Impostor
