@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@theme {
+  --font-cinzel: 'Cinzel', serif;
+  --font-cinzel-decorative: 'Cinzel Decorative', serif;
+  --font-garamond: 'EB Garamond', serif;
+
+  --color-got-black: #0a0a0a;
+  --color-got-charcoal: #1a1a1a;
+  --color-got-dark: #111111;
+  --color-got-gold: #c9a84c;
+  --color-got-gold-light: #e8c96a;
+  --color-got-gold-dark: #8b6914;
+  --color-got-red: #8b1a1a;
+  --color-got-red-bright: #c0392b;
+  --color-got-parchment: #f5e6c8;
+  --color-got-parchment-dark: #e8d5a3;
+  --color-got-stone: #3a3a3a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: #0a0a0a;
+  color: #f5e6c8;
+  font-family: 'EB Garamond', serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+::-webkit-scrollbar-thumb {
+  background: #c9a84c;
+  border-radius: 3px;
+}
+
+/* Gold divider utility */
+.gold-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, #c9a84c, transparent);
+}
+
+/* Perspective for card flip */
+.perspective {
+  perspective: 1200px;
+}
+
+/* Card face base */
+.card-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
