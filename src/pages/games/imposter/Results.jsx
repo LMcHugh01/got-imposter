@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { useGameStore } from '../store/gameStore'
-import PageWrapper from '../components/PageWrapper'
+import { useGameStore } from '../../../store/gameStore'
+import PageWrapper from '../../../components/PageWrapper'
 
 export default function Results() {
   const navigate = useNavigate()
@@ -12,11 +12,11 @@ export default function Results() {
 
   const handlePlayAgain = () => {
     resetGame()
-    navigate('/')
+    navigate('/games/imposter')
   }
 
   if (!winner) {
-    navigate('/')
+    navigate('/games/imposter')
     return null
   }
 

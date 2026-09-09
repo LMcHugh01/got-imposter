@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { useGameStore } from '../store/gameStore'
-import PlayerList from '../components/PlayerList'
-import PageWrapper from '../components/PageWrapper'
+import { useGameStore } from '../../../store/gameStore'
+import PlayerList from '../../../components/PlayerList'
+import PageWrapper from '../../../components/PageWrapper'
 
 export default function Voting() {
   const navigate = useNavigate()
@@ -13,14 +13,14 @@ export default function Voting() {
   const activePlayers = players.filter((p) => !p.isEliminated)
 
   if (activePlayers.length === 0) {
-    navigate('/')
+    navigate('/games/imposter')
     return null
   }
 
   const handleEliminate = () => {
     if (!selectedId) return
     eliminatePlayer(selectedId)
-    navigate('/elimination')
+    navigate('/games/imposter/elimination')
   }
 
   return (

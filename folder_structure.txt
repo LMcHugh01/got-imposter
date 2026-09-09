@@ -1,0 +1,54 @@
+.
+├── CLAUDE.md
+├── folder_structure.txt
+├── index.html
+├── netlify.toml
+├── package-lock.json
+├── package.json
+├── public
+│   ├── _redirects
+│   └── vite.svg
+├── src
+│   ├── App.jsx
+│   ├── components
+│   │   ├── AppLayout.jsx
+│   │   ├── ComingSoon.jsx
+│   │   ├── FlipCard.jsx
+│   │   ├── Footer.jsx
+│   │   ├── GameCard.jsx
+│   │   ├── Header.jsx
+│   │   ├── PageWrapper.jsx
+│   │   └── PlayerList.jsx
+│   ├── index.css
+│   ├── lib
+│   │   ├── gameLogic.js
+│   │   └── supabase.js
+│   ├── main.jsx
+│   ├── pages
+│   │   ├── Draft.jsx
+│   │   ├── Games.jsx
+│   │   ├── Home.jsx
+│   │   ├── ImposterHome.jsx
+│   │   ├── Trivia.jsx
+│   │   ├── WhoAmI.jsx
+│   │   ├── about
+│   │   │   └── About.jsx
+│   │   ├── characters
+│   │   │   └── Characters.jsx
+│   │   ├── games
+│   │   │   ├── draft
+│   │   │   ├── imposter
+│   │   │   │   ├── CardReveal.jsx
+│   │   │   │   ├── EliminationReveal.jsx
+│   │   │   │   ├── Results.jsx
+│   │   │   │   ├── Settings.jsx
+│   │   │   │   └── Voting.jsx
+│   │   │   ├── trivia
+│   │   │   └── whoami
+│   │   └── houses
+│   │       └── Houses.jsx
+│   └── store
+│       └── gameStore.js
+└── vite.config.js
+
+15 directories, 37 files

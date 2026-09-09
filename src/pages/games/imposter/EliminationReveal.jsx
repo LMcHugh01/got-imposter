@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { useGameStore } from '../store/gameStore'
-import { checkWinCondition } from '../lib/gameLogic'
-import PageWrapper from '../components/PageWrapper'
+import { useGameStore } from '../../../store/gameStore'
+import { checkWinCondition } from '../../../lib/gameLogic'
+import PageWrapper from '../../../components/PageWrapper'
 
 export default function EliminationReveal() {
   const navigate = useNavigate()
@@ -14,7 +14,7 @@ export default function EliminationReveal() {
 
   // Guard: if no eliminated player, go home
   useEffect(() => {
-    if (!eliminated) navigate('/')
+    if (!eliminated) navigate('/games/imposter')
   }, [eliminated, navigate])
 
   if (!eliminated) return null
@@ -24,27 +24,13 @@ export default function EliminationReveal() {
   const handleReveal = () => setRevealed(true)
 
   const handleContinue = () => {
-    if (wasImpostor) {
-      // Check if game is over (all impostors eliminated)
-      const result = checkWinCondition(players)
-      if (result) {
-        setWinner(result)
-        navigate('/results')
-      } else {
-        // More impostors remain, continue
-        advanceRound()
-        navigate('/voting')
-      }
+    const result = checkWinCondition(players)
+    if (result) {
+      setWinner(result)
+      navigate('/games/imposter/results')
     } else {
-      // Not impostor — check win condition for impostor win
-      const result = checkWinCondition(players)
-      if (result) {
-        setWinner(result)
-        navigate('/results')
-      } else {
-        advanceRound()
-        navigate('/voting')
-      }
+      advanceRound()
+      navigate('/games/imposter/voting')
     }
   }
 

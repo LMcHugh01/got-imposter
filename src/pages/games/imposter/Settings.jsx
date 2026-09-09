@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { useGameStore } from '../store/gameStore'
-import { fetchRandomCharacter } from '../lib/supabase'
-import { assignImpostors } from '../lib/gameLogic'
-import PageWrapper from '../components/PageWrapper'
+import { useGameStore } from '../../../store/gameStore'
+import { fetchRandomCharacter } from '../../../lib/characterService'
+import { assignImpostors } from '../../../lib/gameLogic'
+import PageWrapper from '../../../components/PageWrapper'
 
 function Stepper({ label, value, min, max, onChange }) {
   return (
@@ -69,7 +69,7 @@ export default function Settings() {
       const character = await fetchRandomCharacter(difficulty)
       const players = assignImpostors(totalPlayers, impostorCount)
       startGame(character, players)
-      navigate('/reveal')
+      navigate('/games/imposter/reveal')
     } catch (err) {
       setError('Failed to load character. Please try again.')
     } finally {
@@ -169,7 +169,7 @@ export default function Settings() {
 
         {/* Back */}
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/games/imposter')}
           className="text-stone-600 text-sm text-center hover:text-stone-400 transition-colors"
           style={{ fontFamily: 'Cinzel, serif' }}
         >

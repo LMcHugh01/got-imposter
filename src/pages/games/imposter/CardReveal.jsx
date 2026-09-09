@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useGameStore } from '../store/gameStore'
-import FlipCard from '../components/FlipCard'
-import PageWrapper from '../components/PageWrapper'
+import { useGameStore } from '../../../store/gameStore'
+import FlipCard from '../../../components/FlipCard'
+import PageWrapper from '../../../components/PageWrapper'
 
 // Card back — decorative face-down card
 function CardBack() {
@@ -201,7 +201,7 @@ export default function CardReveal() {
   }, [currentRevealIndex])
 
   if (!currentPlayer || !secretCharacter) {
-    navigate('/')
+    navigate('/games/imposter')
     return null
   }
 
@@ -211,7 +211,7 @@ export default function CardReveal() {
   const handleNext = () => {
     if (isLastPlayer) {
       advanceReveal() // sets phase to 'voting'
-      navigate('/voting')
+      navigate('/games/imposter/voting')
     } else {
       advanceReveal()
     }
