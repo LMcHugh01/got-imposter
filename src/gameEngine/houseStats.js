@@ -1,0 +1,123 @@
+/**
+ * gameEngine/houseStats.js
+ *
+ * Implements §7 from GOT-DRAFT-CONTEXT.md. Aggregates the drafted council
+ * into 6 house stats using EffectiveAttribute (§6.5) — a well-fit character
+ * contributes more than a poorly-fit one holding the same title.
+ *
+ * The design doc specifies which ROLES feed each stat, not which of their
+ * 8 attributes specifically — that mapping is a judgment call made here,
+ * documented inline. Easy to retune: it's a config object, not logic.
+ */
+
+import { effectiveAttribute } from './ratings'
+
+// { role, attr } — the single attribute pulled from that role's
+// EffectiveAttribute for this stat. "Army quality" (Military) and "recent
+// battle history" (Morale) from §7's table aren't included yet — they
+// depend on the resource/campaign systems (§17 steps 7 and 10), not on the
+// council alone.
+const STAT_CONTRIBUTORS = {
+  military: [
+    { role: 'masterOfWar', attr: 'strategy' },
+    { role: 'commander', attr: 'combat' },
+    { role: 'kingsguard', attr: 'combat' },
+  ],
+  economy: [
+    { role: 'masterOfCoin', attr: 'economy' },
+    { role: 'hand', attr: 'economy' },
+    { role: 'king', attr: 'economy' },
+    { role: 'consort', attr: 'economy' },
+  ],
+  diplomacy: [
+    { role: 'consort', attr: 'diplomacy' },
+    { role: 'king', attr: 'diplomacy' },
+    { role: 'masterOfWhispers', attr: 'diplomacy' },
+  ],
+  intelligence: [
+    { role: 'masterOfWhispers', attr: 'intelligence' },
+    { role: 'hand', attr: 'intelligence' },
+    { role: 'grandMaester', attr: 'intelligence' },
+  ],
+  // §7's original table listed Heir here; Heir no longer exists (per your
+  // change). Grand Maester's loyal counsel takes its place.
+  stability: [
+    { role: 'masterOfLaws', attr: 'politics' },
+    { role: 'king', attr: 'politics' },
+    { role: 'grandMaester', attr: 'loyalty' },
+  ],
+  morale: [
+    { role: 'king', attr: 'leadership' },
+    { role: 'kingsguard', attr: 'loyalty' },
+  ],
+}
+
+export const STAT_LABELS = {
+  military: 'Military',
+  economy: 'Economy',
+  diplomacy: 'Diplomacy',
+  intelligence: 'Intelligence',
+  stability: 'Stability',
+  morale: 'Morale',
+}
+
+/**
+ * `roster` is the array from draftEngine.getFinalRoster() — call this only
+ * once the draft is complete (all 10 roles filled).
+ */
+export function computeHouseStats(roster) {
+  const byRole = Object.fromEntries(roster.map(({ role, character }) => [role.id, character]))
+
+  const stats = {}
+  for (const [statId, contributors] of Object.entries(STAT_CONTRIBUTORS)) {
+    const values = contributors
+      .map(({ role, attr }) => {
+        const character = byRole[role]
+        return character ? effectiveAttribute(character.attributes, role, attr) : null
+      })
+      .filter((v) => v !== null)
+
+    stats[statId] = values.length > 0 ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : 0
+  }
+
+  return stats
+}
+
+/**
+ * §7 — "a weighted roll-up of the above... display it as potential, never
+ * as a win prediction." Equal weights for now (simple average); becomes a
+ * tuned weighted formula later without touching anything else.
+ */
+export function overallHouseRating(stats) {
+  const values = Object.values(stats)
+  return Math.round(values.reduce((a, b) => a + b, 0) / values.length)
+}
+
+const RATING_THRESHOLDS = [
+  { min: 80, label: 'Excellent' },
+  { min: 65, label: 'Strong' },
+  { min: 50, label: 'Solid' },
+  { min: 35, label: 'Weak' },
+  { min: 0, label: 'Poor' },
+]
+
+export function ratingLabel(value) {
+  return RATING_THRESHOLDS.find((t) => value >= t.min).label
+}
+
+/**
+ * §7.2 — plain-language strengths/weaknesses. Strength: stat >= 65.
+ * Weakness: stat < 40. First-pass thresholds — tune during playtesting.
+ */
+export function houseStrengthsWeaknesses(stats) {
+  const strengths = []
+  const weaknesses = []
+
+  for (const [statId, value] of Object.entries(stats)) {
+    const label = STAT_LABELS[statId].toLowerCase()
+    if (value >= 65) strengths.push(`${ratingLabel(value)} ${label}`)
+    else if (value < 40) weaknesses.push(`Low ${label}`)
+  }
+
+  return { strengths, weaknesses }
+}

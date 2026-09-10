@@ -5,7 +5,7 @@ import GameCard from '../components/GameCard'
 
 const GAMES = [
   { icon: '🎭', title: 'Imposter', description: "Find the imposter before it's too late.", to: '/games/imposter' },
-  { icon: '⚔', title: 'Draft', description: 'Build your house. Conquer Westeros.', comingSoon: true },
+  { icon: '⚔', title: 'Draft', description: 'Build your house. Conquer Westeros.', to: '/games/draft' },
   { icon: '🧠', title: 'Who Am I?', description: 'Identify the character from the clues.', comingSoon: true },
   { icon: '❓', title: 'Trivia', description: 'Test your knowledge of Westeros.', comingSoon: true },
 ]

@@ -15,7 +15,7 @@ import Voting from './pages/games/imposter/Voting'
 import EliminationReveal from './pages/games/imposter/EliminationReveal'
 import Results from './pages/games/imposter/Results'
 
-import Draft from './pages/Draft'
+import Draft from './pages/games/draft/Draft'
 import WhoAmI from './pages/WhoAmI'
 import Trivia from './pages/Trivia'
 
