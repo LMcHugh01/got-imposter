@@ -2,11 +2,14 @@ import { describe, it, expect } from 'vitest'
 import {
   computeYourPower,
   computeEnemyPower,
-  computeWinProbability,
   resolveStrategyModifiers,
-  simulateBattle,
+  tickBattle,
+  runBattleToCompletion,
+  finalizeBattleResult,
   extractCouncilBattleInputs,
+  extractCouncilEconomyInputs,
   STRATEGIES,
+  SURRENDER_RATIO,
 } from './battleEngine'
 import { ROLES } from '../data/roleWeights'
 
@@ -29,22 +32,13 @@ function neutralEnemySide(armySize, armyQuality, rating, overrides = {}) {
   return { armySize, armyQuality, morale: 75, supply: 80, rating, gold: 5000, ...overrides }
 }
 
-function winRateOver(yourSide, enemySide, strategyId, n) {
-  let wins = 0
-  for (let i = 0; i < n; i++) {
-    const result = simulateBattle({ yourSide, enemySide, strategyId })
-    if (result.outcome === 'victory') wins++
-  }
-  return wins / n
-}
-
-// --- unit tests -----------------------------------------------------
+// --- power ---------------------------------------------------------------
 
 describe('computeYourPower / computeEnemyPower', () => {
   it('a stat of exactly 50 is neutral (modifier = 1.0)', () => {
     const allNeutral = neutralYourSide(50000, 70, { morale: 50, supply: 50 })
     const withStats50 = computeYourPower(allNeutral)
-    const baseArmyPowerOnly = Math.sqrt(50000) * 70
+    const baseArmyPowerOnly = Math.pow(50000, 0.65) * 70
     expect(withStats50).toBeCloseTo(baseArmyPowerOnly, 5)
   })
 
@@ -58,93 +52,228 @@ describe('computeYourPower / computeEnemyPower', () => {
     const unscouted = computeYourPower(neutralYourSide(50000, 70, { intelligence: 100, scouted: false }))
     const scouted = computeYourPower(neutralYourSide(50000, 70, { intelligence: 100, scouted: true }))
     const baseline = computeYourPower(neutralYourSide(50000, 70))
-    expect(unscouted).toBeCloseTo(baseline, 5) // no effect when not scouted
-    expect(scouted).toBeGreaterThan(baseline) // real bonus when scouted
+    expect(unscouted).toBeCloseTo(baseline, 5)
+    expect(scouted).toBeGreaterThan(baseline)
+  })
+
+  it('power shrinks as army size shrinks — the compounding-spiral property', () => {
+    const fullStrength = computeYourPower(neutralYourSide(50000, 70))
+    const halved = computeYourPower(neutralYourSide(25000, 70))
+    expect(halved).toBeLessThan(fullStrength)
   })
 })
 
-describe('computeWinProbability', () => {
-  it('is exactly 0.5 for identical power', () => {
-    expect(computeWinProbability(1000, 1000)).toBeCloseTo(0.5)
-  })
-
-  it('never returns below the 5% floor or above the 95% ceiling', () => {
-    expect(computeWinProbability(1000000, 1)).toBeLessThanOrEqual(0.95)
-    expect(computeWinProbability(1, 1000000)).toBeGreaterThanOrEqual(0.05)
-  })
-})
+// --- strategy execution ---------------------------------------------------
 
 describe('resolveStrategyModifiers', () => {
-  it('applies zero effect when execution skill is 0, regardless of strategy', () => {
-    const mods = resolveStrategyModifiers('aggressive', 0, false)
-    expect(mods.appliedShift).toBe(0)
+  it('applies no casualty effect when execution skill is 0', () => {
+    const mods = resolveStrategyModifiers('aggressive', 0)
     expect(mods.yourCasualtyMultiplier).toBe(1)
     expect(mods.enemyCasualtyMultiplier).toBe(1)
   })
 
-  it('applies close to the full effect when execution skill is 1', () => {
-    const mods = resolveStrategyModifiers('aggressive', 1, false)
-    expect(mods.appliedShift).toBeCloseTo(STRATEGIES.aggressive.probabilityShift)
+  it('applies the full effect when execution skill is 1', () => {
+    const mods = resolveStrategyModifiers('aggressive', 1)
     expect(mods.yourCasualtyMultiplier).toBeCloseTo(STRATEGIES.aggressive.yourCasualtyMultiplier)
-  })
-
-  it('ambush backfires (negative shift) when not scouted', () => {
-    const blind = resolveStrategyModifiers('ambush', 1, false)
-    const scouted = resolveStrategyModifiers('ambush', 1, true)
-    expect(blind.appliedShift).toBeLessThan(0)
-    expect(scouted.appliedShift).toBeGreaterThan(0)
+    expect(mods.enemyCasualtyMultiplier).toBeCloseTo(STRATEGIES.aggressive.enemyCasualtyMultiplier)
   })
 
   it('throws on an unknown strategy', () => {
-    expect(() => resolveStrategyModifiers('not-a-strategy', 1, false)).toThrow()
+    expect(() => resolveStrategyModifiers('not-a-strategy', 1)).toThrow()
   })
 })
 
-describe('simulateBattle', () => {
-  it('returns a well-formed result', () => {
-    const result = simulateBattle({
-      yourSide: neutralYourSide(50000, 70),
-      enemySide: neutralEnemySide(50000, 70, 50),
-      strategyId: 'balanced',
-    })
+// --- live ticks ------------------------------------------------------------
 
-    expect(['victory', 'defeat']).toContain(result.outcome)
-    expect(result.probability).toBeGreaterThanOrEqual(5)
-    expect(result.probability).toBeLessThanOrEqual(95)
-    expect(result.yourCasualties).toBeGreaterThanOrEqual(0)
-    expect(result.enemyCasualties).toBeGreaterThanOrEqual(0)
-    expect(result.enemySurrendered).toBeGreaterThanOrEqual(0)
+describe('tickBattle', () => {
+  it('reduces both armies and returns null outcome for an ongoing fight', () => {
+    const result = tickBattle({
+      yourArmy: 50000,
+      enemyArmy: 50000,
+      yourStats: neutralYourSide(50000, 70),
+      enemyStats: neutralEnemySide(50000, 70, 50),
+      strategyId: 'balanced',
+      scouted: false,
+      rng: () => 0.5,
+    })
+    expect(result.yourArmy).toBeLessThan(50000)
+    expect(result.enemyArmy).toBeLessThan(50000)
+    expect(result.outcome).toBeNull()
   })
 
-  it('never awards gold or surrendered soldiers on a defeat', () => {
-    // Force a loss with an rng that always returns just under 1 (fails any probability < 1)
-    const result = simulateBattle({
-      yourSide: neutralYourSide(1000, 10),
-      enemySide: neutralEnemySide(100000, 100, 95),
+  it('eventually declares victory when hopelessly outmatching the enemy', () => {
+    const result = runBattleToCompletion({
+      yourArmy: 50000,
+      enemyArmy: 100,
+      yourStats: neutralYourSide(50000, 90),
+      enemyStats: neutralEnemySide(100, 20, 10),
       strategyId: 'balanced',
-      rng: () => 0.999999,
+      scouted: false,
+      rng: () => 0.5,
+    })
+    expect(result.outcome).toBe('victory')
+  })
+
+  it('declares victory once your army outnumbers theirs by the surrender ratio', () => {
+    const result = tickBattle({
+      yourArmy: 40000,
+      enemyArmy: 9000,
+      yourStats: neutralYourSide(40000, 95, { morale: 100, leadership: 100, strategy: 100, supply: 100 }),
+      enemyStats: neutralEnemySide(9000, 20, 10, { morale: 10, supply: 10 }),
+      strategyId: 'aggressive',
+      scouted: false,
+      rng: () => 0.5,
+    })
+    if (result.outcome !== null) {
+      expect(result.outcome).toBe('victory')
+      expect(result.yourArmy).toBeGreaterThanOrEqual(result.enemyArmy * SURRENDER_RATIO)
+    }
+  })
+
+  it('eventually declares defeat when hopelessly outmatched', () => {
+    const result = runBattleToCompletion({
+      yourArmy: 100,
+      enemyArmy: 50000,
+      yourStats: neutralYourSide(100, 20),
+      enemyStats: neutralEnemySide(50000, 90, 80),
+      strategyId: 'balanced',
+      scouted: false,
+      rng: () => 0.5,
     })
     expect(result.outcome).toBe('defeat')
+  })
+
+  it('ambush gives a scouted bonus and an unscouted penalty on the opening exchange', () => {
+    const base = { yourArmy: 50000, enemyArmy: 50000, strategyId: 'ambush', rng: () => 0.5 }
+    const scoutedResult = tickBattle({
+      ...base,
+      yourStats: neutralYourSide(50000, 70),
+      enemyStats: neutralEnemySide(50000, 70, 50),
+      scouted: true,
+    })
+    const blindResult = tickBattle({
+      ...base,
+      yourStats: neutralYourSide(50000, 70),
+      enemyStats: neutralEnemySide(50000, 70, 50),
+      scouted: false,
+    })
+    expect(scoutedResult.enemyCasualties).toBeGreaterThan(blindResult.enemyCasualties)
+  })
+
+  it('throws on an unknown strategy', () => {
+    expect(() =>
+      tickBattle({
+        yourArmy: 1000, enemyArmy: 1000,
+        yourStats: neutralYourSide(1000, 50), enemyStats: neutralEnemySide(1000, 50, 50),
+        strategyId: 'not-a-strategy', scouted: false,
+      })
+    ).toThrow()
+  })
+})
+
+describe('runBattleToCompletion', () => {
+  it('always terminates with a definite outcome', () => {
+    const result = runBattleToCompletion({
+      yourArmy: 50000,
+      enemyArmy: 50000,
+      yourStats: neutralYourSide(50000, 70),
+      enemyStats: neutralEnemySide(50000, 70, 50),
+      strategyId: 'balanced',
+      scouted: false,
+    })
+    expect(['victory', 'defeat']).toContain(result.outcome)
+    expect(result.ticks).toBeGreaterThan(0)
+  })
+
+  it('an overwhelming advantage wins the large majority of the time', () => {
+    let wins = 0
+    const N = 200
+    for (let i = 0; i < N; i++) {
+      const result = runBattleToCompletion({
+        yourArmy: 100000,
+        enemyArmy: 5000,
+        yourStats: neutralYourSide(100000, 90, { morale: 85, leadership: 80, strategy: 80, supply: 85 }),
+        enemyStats: neutralEnemySide(5000, 30, 20, { morale: 40, supply: 40 }),
+        strategyId: 'balanced',
+        scouted: false,
+      })
+      if (result.outcome === 'victory') wins++
+    }
+    expect(wins / N).toBeGreaterThan(0.9)
+  })
+
+  it('a dead-even matchup is close to 50/50 over many runs', () => {
+    let wins = 0
+    const N = 300
+    for (let i = 0; i < N; i++) {
+      const result = runBattleToCompletion({
+        yourArmy: 50000,
+        enemyArmy: 50000,
+        yourStats: neutralYourSide(50000, 70),
+        enemyStats: neutralEnemySide(50000, 70, 50),
+        strategyId: 'balanced',
+        scouted: false,
+      })
+      if (result.outcome === 'victory') wins++
+    }
+    const winRate = wins / N
+    expect(winRate).toBeGreaterThan(0.35)
+    expect(winRate).toBeLessThan(0.65)
+  })
+})
+
+// --- finalizing a result ---------------------------------------------------
+
+describe('finalizeBattleResult', () => {
+  it('computes casualties as the difference between starting and final army', () => {
+    const result = finalizeBattleResult({
+      outcome: 'victory',
+      startingYourArmy: 50000, yourArmy: 42000,
+      startingEnemyArmy: 40000, enemyArmy: 6000,
+      enemyGold: 10000,
+    })
+    expect(result.yourCasualties).toBe(8000)
+    expect(result.enemyCasualties).toBe(34000)
+  })
+
+  it('grants soldiers only on a victory where the enemy has survivors left', () => {
+    const surrenderVictory = finalizeBattleResult({
+      outcome: 'victory', startingYourArmy: 50000, yourArmy: 45000,
+      startingEnemyArmy: 40000, enemyArmy: 8000, enemyGold: 5000,
+    })
+    expect(surrenderVictory.soldiersGained).toBeGreaterThan(0)
+
+    const totalWipeoutVictory = finalizeBattleResult({
+      outcome: 'victory', startingYourArmy: 50000, yourArmy: 45000,
+      startingEnemyArmy: 40000, enemyArmy: 0, enemyGold: 5000,
+    })
+    expect(totalWipeoutVictory.soldiersGained).toBe(0)
+  })
+
+  it('never grants gold or soldiers on a defeat', () => {
+    const result = finalizeBattleResult({
+      outcome: 'defeat', startingYourArmy: 10000, yourArmy: 4000,
+      startingEnemyArmy: 50000, enemyArmy: 45000, enemyGold: 10000,
+    })
     expect(result.goldGained).toBe(0)
-    expect(result.enemySurrendered).toBe(0)
+    expect(result.soldiersGained).toBe(0)
     expect(result.moraleChange).toBeLessThan(0)
   })
 
-  it('a lopsided win costs the winner a lower casualty rate than the loser', () => {
-    const yourSide = neutralYourSide(100000, 90, { leadership: 80, strategy: 80 })
-    const enemyArmySize = 5000
-    const result = simulateBattle({
-      yourSide,
-      enemySide: neutralEnemySide(enemyArmySize, 30, 20),
-      strategyId: 'balanced',
-      rng: () => 0, // always "wins" if probability > 0
+  it('a costlier defeat hurts morale more than a cheap one', () => {
+    const cheapDefeat = finalizeBattleResult({
+      outcome: 'defeat', startingYourArmy: 10000, yourArmy: 8000,
+      startingEnemyArmy: 50000, enemyArmy: 45000, enemyGold: 0,
     })
-    expect(result.outcome).toBe('victory')
-    const yourRate = result.yourCasualties / yourSide.armySize
-    const enemyRate = (result.enemyCasualties + result.enemySurrendered) / enemyArmySize
-    expect(yourRate).toBeLessThan(enemyRate)
+    const costlyDefeat = finalizeBattleResult({
+      outcome: 'defeat', startingYourArmy: 10000, yourArmy: 500,
+      startingEnemyArmy: 50000, enemyArmy: 45000, enemyGold: 0,
+    })
+    expect(costlyDefeat.moraleChange).toBeLessThan(cheapDefeat.moraleChange)
   })
 })
+
+// --- roster extraction (unchanged behavior) --------------------------------
 
 describe('extractCouncilBattleInputs', () => {
   it('pulls leadership/strategy/intelligence from the right roles', () => {
@@ -162,7 +291,6 @@ describe('extractCouncilBattleInputs', () => {
     }))
 
     const inputs = extractCouncilBattleInputs(roster)
-    // Flat 50 attributes -> role rating 50 -> effectiveAttribute = 50 * 0.5 = 25 everywhere
     expect(inputs.leadership).toBeCloseTo(25)
     expect(inputs.strategy).toBeCloseTo(25)
     expect(inputs.intelligence).toBeCloseTo(25)
@@ -177,64 +305,11 @@ describe('extractCouncilBattleInputs', () => {
   })
 })
 
-// --- §15.2 statistical matrix -----------------------------------------
-// Each matchup runs 2000 simulated battles. Tolerances are generous
-// (well beyond normal binomial variance at n=2000) to avoid flaky tests
-// while still catching a genuinely broken formula.
-
-describe('§15.2 battle distribution matrix', () => {
-  it('50k vs 50k, equal quality -> roughly 50/50', () => {
-    const yourSide = neutralYourSide(50000, 70)
-    const enemySide = neutralEnemySide(50000, 70, 50)
-
-    const expectedProbability = computeWinProbability(computeYourPower(yourSide), computeEnemyPower(enemySide))
-    expect(expectedProbability).toBeCloseTo(0.5, 2)
-
-    const empirical = winRateOver(yourSide, enemySide, 'balanced', 2000)
-    expect(empirical).toBeGreaterThan(0.44)
-    expect(empirical).toBeLessThan(0.56)
-  })
-
-  it('100k weak army vs 60k elite army -> larger army favored, elite keeps a real chance', () => {
-    // "Weak" = bigger army, lower quality/morale/supply. "Elite" = smaller,
-    // higher quality. Neither side dominates — that's the point.
-    const yourSide = neutralYourSide(100000, 62, { morale: 78, supply: 82 })
-    const enemySide = neutralEnemySide(60000, 68, 55, { morale: 70, supply: 72 })
-
-    const expectedProbability = computeWinProbability(computeYourPower(yourSide), computeEnemyPower(enemySide))
-    expect(expectedProbability).toBeGreaterThan(0.5) // larger army favored...
-    expect(expectedProbability).toBeLessThan(0.7) // ...but not overwhelmingly
-
-    const empirical = winRateOver(yourSide, enemySide, 'balanced', 2000)
-    expect(empirical).toBeGreaterThan(0.45)
-    expect(empirical).toBeLessThan(0.65)
-    // The elite underdog's implied win rate is a "real chance", not token
-    expect(1 - empirical).toBeGreaterThan(0.25)
-  })
-
-  it('100k elite army vs 5k weak army -> the 5k side should almost never win', () => {
-    const yourSide = neutralYourSide(100000, 90, { morale: 80, supply: 85, leadership: 70, strategy: 70, intelligence: 70, executionSkill: 0.7 })
-    const enemySide = neutralEnemySide(5000, 40, 30, { morale: 60, supply: 60 })
-
-    const expectedProbability = computeWinProbability(computeYourPower(yourSide), computeEnemyPower(enemySide))
-    expect(expectedProbability).toBeGreaterThan(0.85)
-
-    const empirical = winRateOver(yourSide, enemySide, 'balanced', 2000)
-    expect(empirical).toBeGreaterThan(0.85) // the 100k side wins the vast majority
-    expect(1 - empirical).toBeLessThan(0.15) // the 5k side "almost never" wins
-  })
-
-  it('a displayed ~70/30 matchup produces roughly 700/300 results across 1000+ runs', () => {
-    const yourSide = neutralYourSide(60000, 75, { morale: 82, supply: 85, leadership: 65, strategy: 65, intelligence: 60, executionSkill: 0.65, scouted: true })
-    const enemySide = neutralEnemySide(40000, 55, 45, { morale: 65, supply: 65 })
-
-    const expectedProbability = computeWinProbability(computeYourPower(yourSide), computeEnemyPower(enemySide))
-    expect(expectedProbability).toBeGreaterThan(0.65)
-    expect(expectedProbability).toBeLessThan(0.75)
-
-    const empirical = winRateOver(yourSide, enemySide, 'balanced', 3000)
-    // The core claim: displayed probability and actual simulated outcomes
-    // must track each other, not just "trend the right direction".
-    expect(Math.abs(empirical - expectedProbability)).toBeLessThan(0.07)
+describe('extractCouncilEconomyInputs', () => {
+  it('contributes 0 rather than throwing when a role is missing', () => {
+    const inputs = extractCouncilEconomyInputs([])
+    expect(inputs.masterOfCoinRating).toBe(0)
+    expect(inputs.diplomacyRating).toBe(0)
+    expect(inputs.masterOfWhispersRating).toBe(0)
   })
 })

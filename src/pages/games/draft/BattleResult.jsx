@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { SHOW_DEBUG_NUMBERS } from '../../../config/features'
 import { ratingLabel } from '../../../gameEngine/houseStats'
 
 export default function BattleResult({
@@ -32,10 +31,7 @@ export default function BattleResult({
         >
           {won ? 'Victory' : 'Defeat'}
         </h1>
-        <p className="text-stone-500 text-sm mt-1">
-          vs {enemyHouse.name}
-          {SHOW_DEBUG_NUMBERS && ` · ${result.probability}% estimated chance`}
-        </p>
+        <p className="text-stone-500 text-sm mt-1">vs {enemyHouse.name}</p>
         <div className="gold-divider mt-3" />
       </div>
 

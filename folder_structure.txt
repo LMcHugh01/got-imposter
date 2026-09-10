@@ -8,6 +8,10 @@
 ├── public
 │   ├── _redirects
 │   └── vite.svg
+├── scripts
+│   ├── character-shortlist.csv
+│   ├── checkDraftPool.mjs
+│   └── seedCharacters.mjs
 ├── src
 │   ├── App.jsx
 │   ├── components
@@ -19,8 +23,35 @@
 │   │   ├── Header.jsx
 │   │   ├── PageWrapper.jsx
 │   │   └── PlayerList.jsx
+│   ├── config
+│   │   └── features.js
+│   ├── data
+│   │   └── roleweights.js
+│   ├── gameEngine
+│   │   ├── battleEngine.js
+│   │   ├── battleEngine.test.js
+│   │   ├── campaign.js
+│   │   ├── campaign.test.js
+│   │   ├── diplomacy.js
+│   │   ├── diplomacy.test.js
+│   │   ├── draftEngine.js
+│   │   ├── draftEngine.test.js
+│   │   ├── economy.js
+│   │   ├── economy.test.js
+│   │   ├── houseStats.js
+│   │   ├── houseStats.test.js
+│   │   ├── intelligence.js
+│   │   ├── intelligence.test.js
+│   │   ├── modifiers.js
+│   │   ├── ratings.js
+│   │   ├── ratings.test.js
+│   │   ├── resources.js
+│   │   └── resources.test.js
 │   ├── index.css
 │   ├── lib
+│   │   ├── characterAttributesService.js
+│   │   ├── characterService.js
+│   │   ├── enemyHouseService.js
 │   │   ├── gameLogic.js
 │   │   └── supabase.js
 │   ├── main.jsx
@@ -37,6 +68,15 @@
 │   │   │   └── Characters.jsx
 │   │   ├── games
 │   │   │   ├── draft
+│   │   │   │   ├── Battle.jsx
+│   │   │   │   ├── BattleResult.jsx
+│   │   │   │   ├── CampaignAction.jsx
+│   │   │   │   ├── CampaignVictory.jsx
+│   │   │   │   ├── Draft.jsx
+│   │   │   │   ├── DraftBoard.jsx
+│   │   │   │   ├── RoleGrid.jsx
+│   │   │   │   ├── Roster.jsx
+│   │   │   │   └── fitLabel.js
 │   │   │   ├── imposter
 │   │   │   │   ├── CardReveal.jsx
 │   │   │   │   ├── EliminationReveal.jsx
@@ -51,4 +91,4 @@
 │       └── gameStore.js
 └── vite.config.js
 
-15 directories, 37 files
+19 directories, 73 files

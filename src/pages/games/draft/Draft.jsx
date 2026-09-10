@@ -12,7 +12,6 @@ import {
 import {
   extractCouncilBattleInputs,
   extractCouncilEconomyInputs,
-  simulateBattle,
 } from '../../../gameEngine/battleEngine'
 import { gatherIntelligence } from '../../../gameEngine/intelligence'
 import {
@@ -138,15 +137,13 @@ export default function Draft() {
     []
   )
 
-  const handleEngage = useCallback(
-    (strategyId) => {
-      const { yourSide, enemySide } = buildBattleSides(campaign, enemyHouse, scouted)
-      const result = simulateBattle({ yourSide, enemySide, strategyId })
-      setBattleResult(result)
-      setStatus('battleResult')
-    },
-    [campaign, enemyHouse, scouted]
-  )
+  // Battle.jsx now owns the entire live fight internally (ticking army
+  // counts, mid-fight strategy switches, surrender) and only calls this
+  // once, when the fight is actually decided.
+  const handleBattleComplete = useCallback((finalResult) => {
+    setBattleResult(finalResult)
+    setStatus('battleResult')
+  }, [])
 
   // Campaign/enemyHouse (and any campaign-action spend) are untouched by a
   // failed attempt (results are only committed via handleContinue/
@@ -264,7 +261,7 @@ export default function Draft() {
             {scouted && ' · Scouted'}
           </p>
         </div>
-        <Battle yourSide={yourSide} enemySide={enemySide} enemyArmyRange={enemyArmyRange} onEngage={handleEngage} />
+        <Battle yourSide={yourSide} enemySide={enemySide} enemyArmyRange={enemyArmyRange} onComplete={handleBattleComplete} />
       </PageWrapper>
     )
   }

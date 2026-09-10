@@ -1,19 +1,24 @@
 /**
  * gameEngine/battleEngine.js
  *
- * Implements §10 and §11 from GOT-DRAFT-CONTEXT.md. Pure functions only —
- * no React, no Supabase. Never does `if (yourRating > enemyRating) win()`
- * (§10.1): always power -> probability -> modifiers -> random roll ->
- * casualties, exactly as the doc requires.
+ * A battle is now a live, tick-based fight rather than a single dice roll.
+ * Each tick recomputes power from the CURRENT (shrinking) army sizes, so a
+ * losing side's disadvantage compounds tick over tick — a real spiral, not
+ * a one-shot probability. The player watches both armies' live counts and
+ * can switch strategy or surrender mid-fight; there's no fixed round count
+ * and no pre-battle win-probability display — the outcome unfolds from
+ * play, not from a number shown up front.
  *
- * The doc names each modifier (Morale, Leadership, Strategy, Supply,
- * Intelligence) but doesn't give exact formulas for turning a 0-100 stat
- * into a multiplier, or for casualties/loot/morale deltas after the roll —
- * those are first-draft judgment calls made here, same as the house-stats
- * mapping in step 6. All flagged inline. Expect a balancing pass (§17 step
- * 12) to retune the constants; the *shape* of the system (sub-linear army
- * size, soft probability caps, strategy execution scaled by council skill)
- * is what §11's guardrails actually require and is what's tested here.
+ * Ends when either side's army hits 0, or the player's army outnumbers
+ * the enemy's 5:1 (forcing their surrender) — matching the player's own
+ * design call, not an arbitrary round cap.
+ *
+ * Exact constants (tick casualty rate, jitter, the 5:1 threshold, post-
+ * battle gold/morale/supply deltas) are first-draft, same caveat as
+ * everywhere else in this engine — expect the balancing pass (§17 step 12)
+ * to retune them. The *shape* (sub-linear army size, strategy execution
+ * scaled by council skill, casualties compounding as armies shrink) is
+ * what's load-bearing and what's tested here.
  */
 
 import { effectiveAttribute } from './ratings'
@@ -22,17 +27,10 @@ import { statToModifier } from './modifiers'
 // --- tunable constants -----------------------------------------------
 
 // §11 guardrail 1 — army size is sub-linear so a bigger army can't
-// automatically flatten a smaller elite one. sqrt (0.5) was the original
-// choice but proved too forgiving in practice: a 6x army mismatch (10k vs
-// 60k) only produced a ~2.4x power gap under sqrt, letting a wildly
-// outnumbered side keep a ~30% win chance even against a stat-comparable
-// opponent. 0.65 steepens that (a 6x mismatch is now ~3.2x power) without
-// going fully linear (1.0), which would let "just build the biggest army"
-// dominate every matchup and break pillar 2's "no dominant strategy."
-// There's a real, unresolved tension here between "big mismatches should
-// feel decisive" and "a smaller elite army should stay viable" — this is
-// a step toward the former without abandoning the latter, not a final
-// answer. Expect further tuning in the balancing pass (§17 step 12).
+// automatically flatten a smaller elite one. See the battle-probability
+// tuning discussion this was already retuned from sqrt (0.5) to 0.65 —
+// still an open, deliberately-deferred tension between "big mismatches
+// should feel decisive" and "a smaller elite army should stay viable."
 const ARMY_SIZE_EXPONENT = 0.65
 
 // Each modifier maps a 0-100 stat to a multiplier via this range. Ranges
@@ -47,77 +45,75 @@ const MODIFIER_RANGES = {
   enemyRating: [0.85, 1.15], // stands in for the enemy's own leadership/strategy
 }
 
-// §10.3 — "never 0% or 100%". Also directly enforces §11 guardrail 4: no
-// single stat can push probability past these caps, because nothing in
-// the formula runs after this clamp.
-const PROBABILITY_FLOOR = 0.05
-const PROBABILITY_CEILING = 0.95
+// Your army outnumbering theirs by this ratio forces their surrender.
+export const SURRENDER_RATIO = 5
 
-// §5.4 / §10.4 — Aggressive/Balanced/Defensive/Ambush base effects, before
-// being scaled by how skilled your council is at executing them.
-//
-// Aggressive/Balanced/Defensive deliberately do NOT shift win probability —
-// per §10.4 their tradeoff is entirely in casualties ("more damage dealt
-// and taken" / "fewer casualties both sides"). Giving them a probability
-// shift too made Aggressive strictly best and Defensive strictly worst for
-// win chance, which is a dominant-strategy problem (§1 pillar 2). Only
-// Ambush genuinely swings probability, because that's explicitly its
-// design: "high risk/high reward."
+// Fraction of a side's CURRENT army it can lose in one tick when the fight
+// is dead even (yourShare = 0.5); scales down/up from there based on who's
+// winning that tick. +/- jitter keeps it from feeling like a metronome.
+const BASE_TICK_CASUALTY_RATE = 0.07
+const TICK_JITTER = 0.25
+
+// Safety valve — should essentially never be hit (integer rounding alone
+// makes armies diverge over time), but guarantees a live battle can't hang.
+const MAX_TICKS = 80
+
+// §5.4 / §10.4 — Aggressive/Balanced/Defensive/Ambush casualty effects,
+// before being scaled by how skilled your council is at executing them.
+// Aggressive/Balanced/Defensive deliberately do NOT shift the underlying
+// power balance — per §10.4 their tradeoff is entirely in casualties
+// ("more damage dealt and taken" / "fewer casualties both sides"). Giving
+// them a power shift too made Aggressive strictly best, which is a
+// dominant-strategy problem (§1 pillar 2). Ambush is the deliberate
+// exception — see AMBUSH_SHARE_BONUS below.
 export const STRATEGIES = {
-  aggressive: { probabilityShift: 0, yourCasualtyMultiplier: 1.3, enemyCasualtyMultiplier: 1.35 },
-  balanced: { probabilityShift: 0, yourCasualtyMultiplier: 1.0, enemyCasualtyMultiplier: 1.0 },
-  defensive: { probabilityShift: 0, yourCasualtyMultiplier: 0.65, enemyCasualtyMultiplier: 0.8 },
-  // "requires decent Intelligence to be worth it" (§10.4) — enforced in
-  // resolveStrategyModifiers: unscouted Ambush flips this shift negative.
-  ambush: { probabilityShift: 0.08, yourCasualtyMultiplier: 1.1, enemyCasualtyMultiplier: 1.4 },
+  aggressive: { yourCasualtyMultiplier: 1.3, enemyCasualtyMultiplier: 1.35 },
+  balanced: { yourCasualtyMultiplier: 1.0, enemyCasualtyMultiplier: 1.0 },
+  defensive: { yourCasualtyMultiplier: 0.65, enemyCasualtyMultiplier: 0.8 },
+  ambush: { yourCasualtyMultiplier: 1.1, enemyCasualtyMultiplier: 1.4 },
 }
-const AMBUSH_BLIND_PENALTY = -0.1
 
-// --- power & probability (§10.2, §10.3) --------------------------------
+// Ambush only makes sense as an opening move (the UI enforces this — it's
+// not offered again once a fight is underway). Scouted, it's a real
+// surprise-attack edge on that first exchange; blind, it backfires.
+const AMBUSH_SHARE_BONUS = 0.15
+
+// --- power (§10.2) -------------------------------------------------------
+
+function computeModifier(stat, key) {
+  return statToModifier(stat, MODIFIER_RANGES[key])
+}
 
 /**
- * Your side's effective power. `armySize` is sub-linear via a 0.65 power
- * (§11 guardrail 1) — a bigger army matters more than sqrt would give it
- * credit for, but still doesn't scale linearly, so a smaller elite army
- * keeps a genuine (if smaller) chance rather than the guardrail collapsing
- * entirely. See ARMY_SIZE_EXPONENT's comment for the tuning trade-off.
+ * Your side's effective power at the CURRENT army size — called fresh
+ * every tick, not just once, so power genuinely shrinks as casualties
+ * mount. `armySize` is sub-linear (§11 guardrail 1).
  */
 export function computeYourPower({ armySize, armyQuality, morale, supply, leadership, strategy, intelligence, scouted }) {
   const baseArmyPower = Math.pow(Math.max(0, armySize), ARMY_SIZE_EXPONENT) * armyQuality
 
-  const moraleModifier = statToModifier(morale, MODIFIER_RANGES.morale)
-  const leadershipModifier = statToModifier(leadership, MODIFIER_RANGES.leadership)
-  const strategyModifier = statToModifier(strategy, MODIFIER_RANGES.strategy)
-  const supplyModifier = statToModifier(supply, MODIFIER_RANGES.supply)
-  const intelligenceModifier = scouted ? statToModifier(intelligence, MODIFIER_RANGES.intelligence) : 1.0
+  const moraleModifier = computeModifier(morale, 'morale')
+  const leadershipModifier = computeModifier(leadership, 'leadership')
+  const strategyModifier = computeModifier(strategy, 'strategy')
+  const supplyModifier = computeModifier(supply, 'supply')
+  const intelligenceModifier = scouted ? computeModifier(intelligence, 'intelligence') : 1.0
 
   return baseArmyPower * moraleModifier * leadershipModifier * strategyModifier * supplyModifier * intelligenceModifier
 }
 
 /**
- * Enemy side's effective power, computed straight from an enemy_houses row
- * (§12.2) — they don't have a drafted council, just army stats + a rating
+ * Enemy side's effective power at their current army size, computed from
+ * an enemy_houses row (§12.2) — no council, just army stats + a rating
  * standing in for their own leadership/strategy competence.
  */
 export function computeEnemyPower({ armySize, armyQuality, morale, supply, rating }) {
   const baseArmyPower = Math.pow(Math.max(0, armySize), ARMY_SIZE_EXPONENT) * armyQuality
 
-  const moraleModifier = statToModifier(morale, MODIFIER_RANGES.morale)
-  const supplyModifier = statToModifier(supply, MODIFIER_RANGES.supply)
-  const ratingModifier = statToModifier(rating, MODIFIER_RANGES.enemyRating)
+  const moraleModifier = computeModifier(morale, 'morale')
+  const supplyModifier = computeModifier(supply, 'supply')
+  const ratingModifier = computeModifier(rating, 'enemyRating')
 
   return baseArmyPower * moraleModifier * supplyModifier * ratingModifier
-}
-
-function clampProbability(p) {
-  return Math.max(PROBABILITY_FLOOR, Math.min(PROBABILITY_CEILING, p))
-}
-
-/**
- * §10.3 — YourShare = YourPower / (YourPower + EnemyPower), clamped.
- */
-export function computeWinProbability(yourPower, enemyPower) {
-  return clampProbability(yourPower / (yourPower + enemyPower))
 }
 
 // --- strategy execution (§10.4) ----------------------------------------
@@ -128,113 +124,146 @@ export function computeWinProbability(yourPower, enemyPower) {
  * rating, so a poorly-fit Master of War barely gets any benefit (or harm)
  * from picking Aggressive, while a strong one gets close to the full effect.
  */
-export function resolveStrategyModifiers(strategyId, executionSkill, scouted) {
+export function resolveStrategyModifiers(strategyId, executionSkill) {
   const strategy = STRATEGIES[strategyId]
   if (!strategy) {
     throw new Error(`Unknown strategy: "${strategyId}"`)
   }
 
-  let probabilityShift = strategy.probabilityShift
-  if (strategyId === 'ambush' && !scouted) {
-    probabilityShift = AMBUSH_BLIND_PENALTY
-  }
-
   const skill = Math.max(0, Math.min(1, executionSkill))
   return {
-    appliedShift: probabilityShift * skill,
     yourCasualtyMultiplier: 1 + (strategy.yourCasualtyMultiplier - 1) * skill,
     enemyCasualtyMultiplier: 1 + (strategy.enemyCasualtyMultiplier - 1) * skill,
   }
 }
 
-// --- casualties & consequences (§10.6, §10.7) ---------------------------
+// --- live battle ticks ---------------------------------------------------
 
 /**
- * How close the fight was, 0 (total mismatch) to 1 (dead even) — drives
- * casualty rates. A near-even fight is brutal for both sides even if you
- * win it (a Pyrrhic victory, §10.6); a lopsided one is cheap for the
- * favorite and costly for the underdog.
+ * One tick of a live battle. Recomputes power from the CURRENT army sizes
+ * (not the starting ones), deals casualties proportional to who's winning
+ * that exchange, and checks both end conditions.
+ *
+ * yourStats/enemyStats: same shape as computeYourPower/computeEnemyPower's
+ * arguments, minus armySize (that comes from yourArmy/enemyArmy instead,
+ * since it changes every tick).
+ * strategyId: current strategy — can change tick to tick.
+ * rng: injectable for deterministic tests.
+ *
+ * Returns { yourArmy, enemyArmy, yourCasualties, enemyCasualties, outcome }
+ * — outcome is null while the battle continues, 'victory'/'defeat' once
+ * an end condition is hit that tick.
  */
-function closenessOf(probability) {
-  return 1 - Math.abs(probability - 0.5) * 2
+export function tickBattle({ yourArmy, enemyArmy, yourStats, enemyStats, strategyId, scouted, rng = Math.random }) {
+  const strategyMods = resolveStrategyModifiers(strategyId, yourStats.executionSkill ?? 0)
+
+  const yourPower = computeYourPower({ ...yourStats, armySize: yourArmy, scouted })
+  const enemyPower = computeEnemyPower({ ...enemyStats, armySize: enemyArmy })
+
+  let yourShare = yourPower / (yourPower + enemyPower)
+  if (strategyId === 'ambush') {
+    yourShare = Math.max(0, Math.min(1, yourShare + (scouted ? AMBUSH_SHARE_BONUS : -AMBUSH_SHARE_BONUS)))
+  }
+
+  const jitter = () => 1 + (rng() * 2 - 1) * TICK_JITTER
+
+  const yourCasualtyRate = Math.max(0, BASE_TICK_CASUALTY_RATE * (1 - yourShare) * 2 * strategyMods.yourCasualtyMultiplier * jitter())
+  const enemyCasualtyRate = Math.max(0, BASE_TICK_CASUALTY_RATE * yourShare * 2 * strategyMods.enemyCasualtyMultiplier * jitter())
+
+  const yourCasualties = Math.min(yourArmy, Math.round(yourArmy * yourCasualtyRate))
+  const enemyCasualties = Math.min(enemyArmy, Math.round(enemyArmy * enemyCasualtyRate))
+
+  const nextYourArmy = Math.max(0, yourArmy - yourCasualties)
+  const nextEnemyArmy = Math.max(0, enemyArmy - enemyCasualties)
+
+  let outcome = null
+  if (nextEnemyArmy <= 0) {
+    outcome = 'victory'
+  } else if (nextYourArmy <= 0) {
+    outcome = 'defeat'
+  } else if (nextYourArmy >= nextEnemyArmy * SURRENDER_RATIO) {
+    outcome = 'victory'
+  }
+
+  return { yourArmy: nextYourArmy, enemyArmy: nextEnemyArmy, yourCasualties, enemyCasualties, outcome }
 }
-
-function resolveCasualties({ armySize, enemyArmySize, probability, won, yourCasualtyMultiplier, enemyCasualtyMultiplier }) {
-  const closeness = closenessOf(probability)
-  const baseRate = 0.08 + closeness * 0.22 // 0.08 (lopsided) .. 0.30 (even fight)
-
-  const yourRate = Math.min(0.9, (won ? baseRate * 0.55 : baseRate * 1.35) * yourCasualtyMultiplier)
-  const enemyRate = Math.min(0.9, (won ? baseRate * 1.35 : baseRate * 0.55) * enemyCasualtyMultiplier)
-
-  const yourCasualties = Math.round(armySize * yourRate)
-  const enemyCasualtiesRaw = Math.round(enemyArmySize * enemyRate)
-
-  // §10.7 — some enemy losses surrender and join you instead of dying,
-  // but only when you win.
-  const surrenderFraction = won ? 0.15 : 0
-  const enemySurrendered = Math.round(enemyCasualtiesRaw * surrenderFraction)
-  const enemyCasualties = enemyCasualtiesRaw - enemySurrendered
-
-  return { yourCasualties, enemyCasualties, enemySurrendered }
-}
-
-// --- full battle resolution ---------------------------------------------
 
 /**
- * yourSide: { armySize, armyQuality, morale, supply, leadership, strategy,
- *             intelligence, executionSkill, scouted, gold? }
- * enemySide: { armySize, armyQuality, morale, supply, rating, gold? } —
- *            straight from an enemy_houses row (gold is what gets looted)
- * strategyId: one of STRATEGIES' keys
- * rng: injectable for deterministic tests, defaults to Math.random
+ * Runs a live battle start-to-finish without pausing between ticks — not
+ * used by the actual UI (which drives one tick at a time on its own
+ * timer so the player can react), but useful for tests and for verifying
+ * aggregate behavior over many simulated fights.
  */
-/**
- * The probability a battle would resolve in your favor for a given
- * strategy choice, without actually rolling the outcome. Used by the
- * battle prep screen for the live "Estimated Victory Chance" display
- * (§10.6) as the player switches between strategies, and internally by
- * simulateBattle for the actual roll.
- */
-export function computeBattleProbability({ yourSide, enemySide, strategyId = 'balanced' }) {
-  const strategyMods = resolveStrategyModifiers(strategyId, yourSide.executionSkill ?? 0, Boolean(yourSide.scouted))
-  const yourPower = computeYourPower(yourSide)
-  const enemyPower = computeEnemyPower(enemySide)
-  const baseProbability = yourPower / (yourPower + enemyPower)
-  return clampProbability(baseProbability + strategyMods.appliedShift)
+export function runBattleToCompletion({ yourArmy, enemyArmy, yourStats, enemyStats, strategyId, scouted, rng = Math.random }) {
+  let currentYourArmy = yourArmy
+  let currentEnemyArmy = enemyArmy
+  let ticks = 0
+  let outcome = null
+
+  while (outcome === null && ticks < MAX_TICKS) {
+    const result = tickBattle({
+      yourArmy: currentYourArmy,
+      enemyArmy: currentEnemyArmy,
+      yourStats,
+      enemyStats,
+      strategyId: ticks === 0 ? strategyId : strategyId === 'ambush' ? 'balanced' : strategyId,
+      scouted,
+      rng,
+    })
+    currentYourArmy = result.yourArmy
+    currentEnemyArmy = result.enemyArmy
+    outcome = result.outcome
+    ticks += 1
+  }
+
+  if (outcome === null) {
+    // Hit the safety cap — resolve by whoever's ahead rather than hang.
+    outcome = currentYourArmy >= currentEnemyArmy ? 'victory' : 'defeat'
+  }
+
+  return { yourArmy: currentYourArmy, enemyArmy: currentEnemyArmy, outcome, ticks }
 }
 
-export function simulateBattle({ yourSide, enemySide, strategyId = 'balanced', rng = Math.random }) {
-  const strategyMods = resolveStrategyModifiers(strategyId, yourSide.executionSkill ?? 0, Boolean(yourSide.scouted))
-  const probability = computeBattleProbability({ yourSide, enemySide, strategyId })
+// --- surrender & final consequences (§10.6, §10.7) -----------------------
 
-  const won = rng() < probability
+/**
+ * Turns a battle's final army counts into the result shape the UI/campaign
+ * expect — used both when a battle ends naturally (0 army or 5:1
+ * surrender) and when the player voluntarily surrenders. Surrendering
+ * simply stops the fight at its current numbers rather than dealing any
+ * additional casualties — that's what makes it a real choice ("cut losses
+ * now") rather than just a slower version of losing.
+ */
+export function finalizeBattleResult({ outcome, startingYourArmy, yourArmy, startingEnemyArmy, enemyArmy, enemyGold }) {
+  const won = outcome === 'victory'
+  const yourCasualties = Math.max(0, startingYourArmy - yourArmy)
+  const enemyCasualties = Math.max(0, startingEnemyArmy - enemyArmy)
 
-  const { yourCasualties, enemyCasualties, enemySurrendered } = resolveCasualties({
-    armySize: yourSide.armySize,
-    enemyArmySize: enemySide.armySize,
-    probability,
-    won,
-    yourCasualtyMultiplier: strategyMods.yourCasualtyMultiplier,
-    enemyCasualtyMultiplier: strategyMods.enemyCasualtyMultiplier,
-  })
+  // §10.7 — a portion of the enemy's SURVIVING army surrenders and joins
+  // you when you force their surrender with troops still standing; if
+  // their army was wiped out entirely, there's nothing left to gain.
+  const enemySurrendered = won && enemyArmy > 0 ? Math.round(enemyArmy * 0.4) : 0
+  const soldiersGained = enemySurrendered
 
-  const closeness = closenessOf(probability)
-  const goldGained = won ? Math.round((enemySide.gold ?? 0) * (0.15 + closeness * 0.1)) : 0
-  const moraleChange = won ? Math.round(4 + closeness * 4) : -Math.round(6 + closeness * 6)
-  const supplyChange = -Math.round(3 + yourSide.armySize / 5000)
+  const yourLossRate = startingYourArmy > 0 ? yourCasualties / startingYourArmy : 0
+
+  const goldGained = won ? Math.round((enemyGold ?? 0) * 0.2) : 0
+  const moraleChange = won ? Math.round(8 - yourLossRate * 10) : -Math.round(6 + yourLossRate * 10)
+  const supplyChange = -Math.round(3 + startingYourArmy / 5000)
 
   return {
-    outcome: won ? 'victory' : 'defeat',
-    probability: Math.round(probability * 100),
+    outcome,
     yourCasualties,
     enemyCasualties,
     enemySurrendered,
-    soldiersGained: enemySurrendered,
+    soldiersGained,
     goldGained,
     moraleChange,
     supplyChange,
   }
 }
+
+// --- roster -> engine input extraction -----------------------------------
 
 /**
  * Pulls the handful of EffectiveAttribute values the battle formula needs
