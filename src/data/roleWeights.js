@@ -1,11 +1,19 @@
 /**
  * data/roleWeights.js
  *
- * The 10 fixed Draft roles and the weight each of the 8 base attributes
- * carries toward that role's rating (= fit %, see gameEngine/ratings.js).
+ * The 10 fixed Draft roles and the weight each sub-attribute (see
+ * data/attributes.js for the full 23-attribute list) carries toward that
+ * role's rating (= fit %, see gameEngine/ratings.js).
  *
  * This is config, not logic — rebalancing a role is an edit here, not a
  * code change. Every role's weights should sum to 1.0.
+ *
+ * v2 changes from the original 10-role/8-attribute system:
+ *   - Heir removed
+ *   - Grand Maester added (knowledge/advisor role, Intelligence-driven)
+ *   - Master of War merged into Commander
+ *   - Champion added (fills the freed slot — Arya/Bronn/Oberyn-style
+ *     duelist archetype, Technique/Speed/Stealth-driven)
  */
 
 export const ROLES = [
@@ -16,73 +24,99 @@ export const ROLES = [
     { id: 'grandMaester', label: 'Grand Maester' },
     { id: 'masterOfCoin', label: 'Master of Coin' },
     { id: 'masterOfLaws', label: 'Master of Laws' },
-    { id: 'masterOfWar', label: 'Master of War' },
-    { id: 'kingsguard', label: 'Kingsguard' },
     { id: 'commander', label: 'Commander' },
+    { id: 'kingsguard', label: 'Kingsguard' },
+    { id: 'champion', label: 'Champion' },
   ]
   
   export const ROLE_WEIGHTS = {
     king: {
-      leadership: 0.4,
-      politics: 0.25,
-      diplomacy: 0.2,
-      intelligence: 0.15,
+      command: 0.2,
+      duty: 0.15,
+      diplomacy: 0.1,
+      justice: 0.1,
+      family: 0.1,
+      scholarship: 0.1,
+      prestige: 0.1,
+      honour: 0.05,
+      willpower: 0.05,
+      recruitment: 0.05,
     },
     consort: {
-      diplomacy: 0.45,
-      politics: 0.25,
-      leadership: 0.15,
-      loyalty: 0.15,
+      diplomacy: 0.3,
+      duty: 0.15,
+      family: 0.15,
+      etiquette: 0.15,
+      prestige: 0.15,
+      command: 0.05,
+      willpower: 0.05,
     },
     hand: {
-      leadership: 0.25,
-      politics: 0.25,
-      intelligence: 0.2,
-      economy: 0.2,
+      command: 0.15,
+      scholarship: 0.15,
+      selfPreservation: 0.15,
+      subterfuge: 0.15,
+      economy: 0.1,
       diplomacy: 0.1,
+      strategy: 0.1,
+      intimidation: 0.1,
     },
     masterOfWhispers: {
-      intelligence: 0.5,
-      politics: 0.2,
+      subterfuge: 0.25,
+      cunning: 0.2,
+      selfPreservation: 0.15,
+      stealth: 0.1,
+      scholarship: 0.1,
       diplomacy: 0.1,
-      loyalty: 0.1,
-      strategy: 0.1,
+      intimidation: 0.1,
     },
     grandMaester: {
-      intelligence: 0.5,
-      loyalty: 0.2,
+      scholarship: 0.4,
       diplomacy: 0.15,
-      politics: 0.15,
+      subterfuge: 0.15,
+      justice: 0.15,
+      willpower: 0.15,
     },
     masterOfCoin: {
-      economy: 0.45,
-      intelligence: 0.2,
-      politics: 0.2,
-      diplomacy: 0.15,
+      economy: 0.4,
+      cunning: 0.15,
+      selfPreservation: 0.15,
+      diplomacy: 0.1,
+      scholarship: 0.1,
+      subterfuge: 0.1,
     },
     masterOfLaws: {
-      politics: 0.3,
-      leadership: 0.25,
-      loyalty: 0.2,
-      intelligence: 0.15,
-      combat: 0.1,
-    },
-    masterOfWar: {
-      strategy: 0.4,
-      leadership: 0.25,
-      combat: 0.2,
-      intelligence: 0.15,
-    },
-    kingsguard: {
-      combat: 0.65,
-      loyalty: 0.2,
-      leadership: 0.1,
-      strategy: 0.05,
+      justice: 0.3,
+      command: 0.1,
+      intimidation: 0.15,
+      honour: 0.1,
+      duty: 0.1,
+      etiquette: 0.1,
+      scholarship: 0.15,
     },
     commander: {
-      combat: 0.4,
       strategy: 0.3,
-      leadership: 0.2,
-      intelligence: 0.1,
+      command: 0.2,
+      battleMorale: 0.15,
+      honour: 0.1,
+      duty: 0.1,
+      technique: 0.1,
+      recruitment: 0.05,
+    },
+    kingsguard: {
+      duty: 0.1,
+      technique: 0.35,
+      strength: 0.25,
+      endurance: 0.1,
+      willpower: 0.1,
+      intimidation: 0.05,
+      honour: 0.05,
+    },
+    champion: {
+      technique: 0.5,
+      speed: 0.15,
+      stealth: 0.1,
+      strength: 0.15,
+      willpower: 0.1,
     },
   }

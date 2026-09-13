@@ -19,6 +19,14 @@
  * to retune them. The *shape* (sub-linear army size, strategy execution
  * scaled by council skill, casualties compounding as armies shrink) is
  * what's load-bearing and what's tested here.
+ *
+ * v2: extractCouncilBattleInputs/extractCouncilEconomyInputs updated for
+ * the merged Commander role (Master of War no longer exists as a separate
+ * role — pulling from it silently contributed 0, which was quietly
+ * halving the strategy input) and the new attribute names (leadership ->
+ * command; intelligence -> subterfuge, since Master of Whispers's
+ * scouting value now comes from Subterfuge rather than a general
+ * "intelligence" stat that no longer exists).
  */
 
 import { effectiveAttribute } from './ratings'
@@ -119,10 +127,10 @@ export function computeEnemyPower({ armySize, armyQuality, morale, supply, ratin
 // --- strategy execution (§10.4) ----------------------------------------
 
 /**
- * "Effectiveness of the chosen strategy is itself scaled by Master of War +
- * Commander's EffectiveAttribute" — `executionSkill` (0-1) is that combined
- * rating, so a poorly-fit Master of War barely gets any benefit (or harm)
- * from picking Aggressive, while a strong one gets close to the full effect.
+ * "Effectiveness of the chosen strategy is itself scaled by Commander's
+ * EffectiveAttribute" — `executionSkill` (0-1) is that rating, so a
+ * poorly-fit Commander barely gets any benefit (or harm) from picking
+ * Aggressive, while a strong one gets close to the full effect.
  */
 export function resolveStrategyModifiers(strategyId, executionSkill) {
   const strategy = STRATEGIES[strategyId]
@@ -271,6 +279,15 @@ export function finalizeBattleResult({ outcome, startingYourArmy, yourArmy, star
  * shape) — the one seam between the draft/council system and the battle
  * system. Missing roles (shouldn't happen post-draft, but defensively)
  * contribute 0 rather than throwing.
+ *
+ * v2: Master of War merged into Commander — strategy now comes from
+ * Commander alone rather than averaging Commander with a role that no
+ * longer exists (which was silently averaging against a phantom 0,
+ * halving the real value). "leadership" -> Command (both King and
+ * Commander weight Command in the new schema). "intelligence" -> Master
+ * of Whispers's Subterfuge, since a general "intelligence" attribute no
+ * longer exists — Subterfuge (spy network reach) is the closest fit for
+ * scouting quality, same choice made in houseStats.js's Intelligence stat.
  */
 export function extractCouncilBattleInputs(roster) {
   const byRole = Object.fromEntries(roster.map(({ role, character }) => [role.id, character]))
@@ -280,9 +297,9 @@ export function extractCouncilBattleInputs(roster) {
     return character ? effectiveAttribute(character.attributes, roleId, attr) : 0
   }
 
-  const leadership = average([effectiveOrZero('king', 'leadership'), effectiveOrZero('commander', 'leadership')])
-  const strategy = average([effectiveOrZero('masterOfWar', 'strategy'), effectiveOrZero('commander', 'strategy')])
-  const intelligence = effectiveOrZero('masterOfWhispers', 'intelligence')
+  const leadership = average([effectiveOrZero('king', 'command'), effectiveOrZero('commander', 'command')])
+  const strategy = effectiveOrZero('commander', 'strategy')
+  const intelligence = effectiveOrZero('masterOfWhispers', 'subterfuge')
 
   return {
     leadership,
@@ -301,7 +318,7 @@ function average(values) {
 /**
  * Pulls the ratings the campaign actions (§9) need from a completed draft
  * roster — Master of Coin's economy rating for Recruit, King/Consort's
- * diplomacy for Diplomacy, Master of Whispers's intelligence for
+ * diplomacy for Diplomacy, Master of Whispers's subterfuge for
  * Intelligence. Same missing-role-contributes-0 posture as
  * extractCouncilBattleInputs.
  */
@@ -316,6 +333,6 @@ export function extractCouncilEconomyInputs(roster) {
   return {
     masterOfCoinRating: effectiveOrZero('masterOfCoin', 'economy'),
     diplomacyRating: average([effectiveOrZero('king', 'diplomacy'), effectiveOrZero('consort', 'diplomacy')]),
-    masterOfWhispersRating: effectiveOrZero('masterOfWhispers', 'intelligence'),
+    masterOfWhispersRating: effectiveOrZero('masterOfWhispers', 'subterfuge'),
   }
 }

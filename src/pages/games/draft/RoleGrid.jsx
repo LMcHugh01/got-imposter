@@ -1,5 +1,5 @@
 import { ROLES } from '../../../data/roleWeights'
-import { SHOW_DEBUG_NUMBERS } from '../../../config/features'
+import RoleScoreBadge from '../../../components/RoleScoreBadge'
 
 export default function RoleGrid({ draftState, selectedCharacter, onAssign }) {
   return (
@@ -11,19 +11,19 @@ export default function RoleGrid({ draftState, selectedCharacter, onAssign }) {
           return (
             <div
               key={role.id}
-              className="rounded-lg border border-stone-800 bg-stone-900/30 p-3 opacity-50"
+              className="rounded-lg border border-stone-800 bg-stone-900/30 p-3 opacity-50 flex items-center justify-between gap-3"
             >
-              <div className="flex items-center justify-between">
+              <div className="min-w-0">
                 <p
-                  className="text-stone-500 text-xs tracking-widest uppercase"
+                  className="text-stone-500 text-xs tracking-widest uppercase flex items-center gap-1.5"
                   style={{ fontFamily: 'Cinzel, serif' }}
                 >
                   {role.label}
+                  <span className="text-stone-600 text-xs">🔒</span>
                 </p>
-                <span className="text-stone-600 text-xs">🔒</span>
+                <p className="text-stone-400 text-sm mt-1 truncate">{filled.name}</p>
               </div>
-              <p className="text-stone-400 text-sm mt-1 truncate">{filled.name}</p>
-              {SHOW_DEBUG_NUMBERS && <p className="text-stone-600 text-xs">{filled.fit}% fit</p>}
+              <RoleScoreBadge score={filled.fit} size="sm" />
             </div>
           )
         }

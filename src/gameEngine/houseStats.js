@@ -5,23 +5,24 @@
  * into 6 house stats using EffectiveAttribute (§6.5) — a well-fit character
  * contributes more than a poorly-fit one holding the same title.
  *
- * The design doc specifies which ROLES feed each stat, not which of their
- * 8 attributes specifically — that mapping is a judgment call made here,
- * documented inline. Easy to retune: it's a config object, not logic.
+ * The design doc specifies which ROLES feed each stat, not which specific
+ * sub-attribute — that mapping is a judgment call made here, documented
+ * inline. Easy to retune: it's a config object, not logic.
+ *
+ * v2: remapped for the new 10-role / 23-attribute system (Master of War
+ * merged into Commander, Grand Maester and Champion added). Note that
+ * Commander→battleMorale is deliberately used in both Military and
+ * Morale — a Commander's ability to rally the army is relevant to both.
  */
 
 import { effectiveAttribute } from './ratings'
 
-// { role, attr } — the single attribute pulled from that role's
-// EffectiveAttribute for this stat. "Army quality" (Military) and "recent
-// battle history" (Morale) from §7's table aren't included yet — they
-// depend on the resource/campaign systems (§17 steps 7 and 10), not on the
-// council alone.
 const STAT_CONTRIBUTORS = {
   military: [
-    { role: 'masterOfWar', attr: 'strategy' },
-    { role: 'commander', attr: 'combat' },
-    { role: 'kingsguard', attr: 'combat' },
+    { role: 'commander', attr: 'strategy' },
+    { role: 'commander', attr: 'battleMorale' },
+    { role: 'kingsguard', attr: 'strength' },
+    { role: 'champion', attr: 'technique' },
   ],
   economy: [
     { role: 'masterOfCoin', attr: 'economy' },
@@ -35,20 +36,19 @@ const STAT_CONTRIBUTORS = {
     { role: 'masterOfWhispers', attr: 'diplomacy' },
   ],
   intelligence: [
-    { role: 'masterOfWhispers', attr: 'intelligence' },
-    { role: 'hand', attr: 'intelligence' },
-    { role: 'grandMaester', attr: 'intelligence' },
+    { role: 'masterOfWhispers', attr: 'subterfuge' },
+    { role: 'masterOfWhispers', attr: 'scholarship' },
+    { role: 'grandMaester', attr: 'scholarship' },
+    { role: 'hand', attr: 'subterfuge' },
   ],
-  // §7's original table listed Heir here; Heir no longer exists (per your
-  // change). Grand Maester's loyal counsel takes its place.
   stability: [
-    { role: 'masterOfLaws', attr: 'politics' },
-    { role: 'king', attr: 'politics' },
-    { role: 'grandMaester', attr: 'loyalty' },
+    { role: 'masterOfLaws', attr: 'justice' },
+    { role: 'king', attr: 'duty' },
+    { role: 'grandMaester', attr: 'justice' },
   ],
   morale: [
-    { role: 'king', attr: 'leadership' },
-    { role: 'kingsguard', attr: 'loyalty' },
+    { role: 'king', attr: 'command' },
+    { role: 'commander', attr: 'battleMorale' },
   ],
 }
 

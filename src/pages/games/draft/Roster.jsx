@@ -5,7 +5,7 @@ import {
   ratingLabel,
   STAT_LABELS,
 } from '../../../gameEngine/houseStats'
-import { SHOW_DEBUG_NUMBERS } from '../../../config/features'
+import RoleScoreBadge from '../../../components/RoleScoreBadge'
 
 export default function Roster({ roster }) {
   const stats = computeHouseStats(roster)
@@ -99,19 +99,19 @@ export default function Roster({ roster }) {
         {roster.map(({ role, character }) => (
           <div
             key={role.id}
-            className="rounded-lg border border-stone-700 bg-stone-900/60 p-4 flex justify-between items-center"
+            className="rounded-lg border border-stone-700 bg-stone-900/60 p-4 flex justify-between items-center gap-3"
           >
-            <div>
+            <div className="min-w-0">
               <p
                 className="text-got-gold text-xs tracking-widest uppercase"
                 style={{ fontFamily: 'Cinzel, serif' }}
               >
                 {role.label}
               </p>
-              <p className="text-got-parchment text-lg">{character.name}</p>
+              <p className="text-got-parchment text-lg truncate">{character.name}</p>
               <p className="text-stone-500 text-xs">{character.house ?? 'Unaffiliated'}</p>
             </div>
-            {SHOW_DEBUG_NUMBERS && <p className="text-got-gold-light text-xl font-bold">{character.fit}%</p>}
+            <RoleScoreBadge score={character.fit} size="md" />
           </div>
         ))}
       </div>
