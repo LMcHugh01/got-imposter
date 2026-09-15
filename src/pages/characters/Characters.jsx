@@ -268,17 +268,19 @@ function CoefficientsTable() {
                 </td>
                 {ATTRIBUTE_COLUMNS.map((col) => {
                   const weight = weights[col.key]
+                  const hasWeight = weight !== undefined
+                  const isNegative = hasWeight && weight < 0
                   return (
                     <td
                       key={col.key}
                       className={[
                         'py-2.5 px-3 text-right text-sm',
-                        weight ? 'text-got-parchment/80' : 'text-stone-800',
+                        !hasWeight ? 'text-stone-800' : isNegative ? 'text-got-red-bright/90 font-bold' : 'text-got-parchment/80',
                         col.isFirstInCategory ? 'border-l border-stone-900' : '',
                       ].join(' ')}
                       style={{ fontFamily: 'Cinzel, serif' }}
                     >
-                      {weight ? `${Math.round(weight * 100)}%` : '—'}
+                      {hasWeight ? weight.toFixed(2) : '—'}
                     </td>
                   )
                 })}
@@ -286,7 +288,7 @@ function CoefficientsTable() {
                   className="py-2.5 px-3 text-right text-sm text-got-gold/80 border-l border-stone-900"
                   style={{ fontFamily: 'Cinzel, serif' }}
                 >
-                  {Math.round(total * 100)}%
+                  {total.toFixed(2)}
                 </td>
               </tr>
             )

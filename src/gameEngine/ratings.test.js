@@ -9,6 +9,11 @@ import { ALL_ATTRIBUTE_KEYS } from '../data/attributes'
 // silently drift out of sync with the real attribute list again.
 const FLAT_50 = Object.fromEntries(ALL_ATTRIBUTE_KEYS.map((key) => [key, 50]))
 
+// All-0 and all-100 fixtures specifically to exercise the 1-99 clamp —
+// raw weighted sums of 0 and 100 both get pulled inside the range.
+const ALL_ZERO = Object.fromEntries(ALL_ATTRIBUTE_KEYS.map((key) => [key, 0]))
+const ALL_MAX = Object.fromEntries(ALL_ATTRIBUTE_KEYS.map((key) => [key, 100]))
+
 // Isolates exactly how much a single attribute contributes to each role —
 // every other attribute is 0, so a role's rating IS that attribute's weight
 // (as a percentage), nothing else in the mix.
@@ -34,17 +39,25 @@ describe('roleRating', () => {
     Object.values(ratings).forEach((rating) => expect(rating).toBe(50))
   })
 
+  it('clamps ratings to 1-99, never 0 or 100', () => {
+    const zeroRatings = allRoleRatings(ALL_ZERO)
+    Object.values(zeroRatings).forEach((rating) => expect(rating).toBe(1))
+
+    const maxRatings = allRoleRatings(ALL_MAX)
+    Object.values(maxRatings).forEach((rating) => expect(rating).toBe(99))
+  })
+
   it('weights a single attribute correctly per role', () => {
     const techniqueOnly = attributeOnly('technique')
     expect(roleRating(techniqueOnly, 'kingsguard')).toBe(25) // technique 25%
     expect(roleRating(techniqueOnly, 'champion')).toBe(30) // technique 30%
     expect(roleRating(techniqueOnly, 'commander')).toBe(10) // technique 10%
-    expect(roleRating(techniqueOnly, 'king')).toBe(0) // technique has no weight here
+    expect(roleRating(techniqueOnly, 'king')).toBe(1) // technique has no weight here -> clamps up from 0
 
     const commandOnly = attributeOnly('command')
     expect(roleRating(commandOnly, 'king')).toBe(20) // command 20%
     expect(roleRating(commandOnly, 'commander')).toBe(20) // command 20%
-    expect(roleRating(commandOnly, 'kingsguard')).toBe(0) // command has no weight here
+    expect(roleRating(commandOnly, 'kingsguard')).toBe(1) // command has no weight here -> clamps up from 0
   })
 
   it('matches hand-calculated TEST_CHARACTER fixture', () => {

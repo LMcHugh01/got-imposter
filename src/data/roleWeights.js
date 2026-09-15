@@ -6,7 +6,11 @@
  * role's rating (= fit %, see gameEngine/ratings.js).
  *
  * This is config, not logic — rebalancing a role is an edit here, not a
- * code change. Every role's weights should sum to 1.0.
+ * code change. Every role's weights should sum to 1.0 (negative weights
+ * are fine — they're penalties, e.g. Grand Maester penalizing Family —
+ * but the POSITIVE weights need to sum to 1.0 + |penalty total| so the
+ * net still lands on 1.0. roleRating() clamps the final result to 1-99
+ * regardless, see gameEngine/ratings.js).
  *
  * v2 changes from the original 10-role/8-attribute system:
  *   - Heir removed
@@ -14,6 +18,12 @@
  *   - Master of War merged into Commander
  *   - Champion added (fills the freed slot — Arya/Bronn/Oberyn-style
  *     duelist archetype, Technique/Speed/Stealth-driven)
+ *
+ * v3: negative-weight penalties added to several roles, reflecting traits
+ * that actively undermine that role rather than just being irrelevant to
+ * it (e.g. a Maester's vow forswearing family ties). Kingsguard and
+ * Champion were independently redesigned on top of this, not just
+ * patched with a penalty.
  */
 
 export const ROLES = [
@@ -62,20 +72,27 @@ export const ROLES = [
       intimidation: 0.1,
     },
     masterOfWhispers: {
-      subterfuge: 0.25,
-      cunning: 0.2,
+      // Honour -10%: a spymaster too honorable to blackmail, deceive, or
+      // betray isn't an effective one — Varys works because he isn't
+      // burdened by it.
+      subterfuge: 0.3,
+      cunning: 0.25,
       selfPreservation: 0.15,
       stealth: 0.1,
       scholarship: 0.1,
       diplomacy: 0.1,
       intimidation: 0.1,
+      honour: -0.1,
     },
     grandMaester: {
-      scholarship: 0.4,
+      // Family -10%: the Maester's vow forswears family ties in service of
+      // the realm/order — a strong pull toward family undermines that.
+      scholarship: 0.45,
       diplomacy: 0.15,
       subterfuge: 0.15,
       justice: 0.15,
-      willpower: 0.15,
+      willpower: 0.2,
+      family: -0.1,
     },
     masterOfCoin: {
       economy: 0.4,
@@ -86,23 +103,33 @@ export const ROLES = [
       subterfuge: 0.1,
     },
     masterOfLaws: {
-      justice: 0.3,
-      command: 0.1,
+      // Subterfuge -10%: justice enforced through backroom scheming and
+      // manipulation undermines the rule of law itself — the law should be
+      // applied, not maneuvered.
+      justice: 0.35,
+      command: 0.2,
       intimidation: 0.15,
       honour: 0.1,
       duty: 0.1,
       etiquette: 0.1,
-      scholarship: 0.15,
+      scholarship: 0.1,
+      subterfuge: -0.1,
     },
     commander: {
-      strategy: 0.3,
-      command: 0.2,
+      // Self-Preservation -10%: a commander too worried about his own
+      // safety won't lead from the front, and troops notice — Robb/Jon
+      // inspire because they share the risk.
+      strategy: 0.35,
+      command: 0.25,
       battleMorale: 0.15,
       honour: 0.1,
       duty: 0.1,
       technique: 0.1,
       recruitment: 0.05,
+      selfPreservation: -0.1,
     },
+    // Redesigned independently of the "add a penalty" pass above — no
+    // negative weight here, just a different positive-weight composition.
     kingsguard: {
       duty: 0.1,
       technique: 0.35,
@@ -112,6 +139,7 @@ export const ROLES = [
       intimidation: 0.05,
       honour: 0.05,
     },
+    // Also redesigned independently — no negative weight.
     champion: {
       technique: 0.5,
       speed: 0.15,

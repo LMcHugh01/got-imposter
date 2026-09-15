@@ -3,16 +3,35 @@
  *
  * Implements §6.2 (role rating = fit %) and §6.5 (EffectiveAttribute) from
  * GOT-DRAFT-CONTEXT.md. Pure functions only — no React, no Supabase calls.
- * Takes a plain attributes object (the 8 base stats) and works from there,
- * so it's testable with fixed fixtures and reusable anywhere in the engine.
+ * Takes a plain attributes object (the 23 base stats) and works from
+ * there, so it's testable with fixed fixtures and reusable anywhere in
+ * the engine.
  */
 
 import { ROLE_WEIGHTS, ROLES } from '../data/roleWeights'
 
+// Ratings clamp to this range — never a flat 0 (nobody's a total
+// write-off) and never a perfect 100 (nobody's flawless). This matters
+// beyond cosmetics: effectiveAttribute() divides by 100 and uses the
+// result as a direct multiplier, so an unclamped negative-weight role
+// could otherwise push a rating below 0 or above 100 and invert what
+// EffectiveAttribute is supposed to do (scale a contribution down, never
+// flip its sign or amplify it past the raw value).
+const MIN_RATING = 1
+const MAX_RATING = 99
+
+function clampRating(value) {
+  return Math.min(MAX_RATING, Math.max(MIN_RATING, value))
+}
+
 /**
  * A character's rating for a single role — also their "fit %" for that
- * role (§6.2: same number, two uses). 0-100, rounded to the nearest whole
- * number for display.
+ * role (§6.2: same number, two uses). Clamped to 1-99 (see above).
+ *
+ * Negative weights are supported (e.g. Grand Maester penalizing Family) —
+ * roleRating() itself doesn't care about sign, it's just a weighted sum.
+ * The clamp is what keeps a heavily-penalized character's score from
+ * going negative rather than reading as "very poor fit."
  */
 export function roleRating(attributes, roleId) {
   const weights = ROLE_WEIGHTS[roleId]
@@ -25,7 +44,7 @@ export function roleRating(attributes, roleId) {
     0
   )
 
-  return Math.round(rating)
+  return clampRating(Math.round(rating))
 }
 
 /**
@@ -63,7 +82,7 @@ export function effectiveAttribute(attributes, roleId, attr) {
 }
 
 /**
- * All 8 attributes scaled by fit % for a given role at once — convenient
+ * All attributes scaled by fit % for a given role at once — convenient
  * when computing a character's full contribution to house stats.
  */
 export function effectiveAttributes(attributes, roleId) {
