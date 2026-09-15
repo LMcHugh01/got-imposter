@@ -4,6 +4,7 @@ import PageWrapper from '../../components/PageWrapper'
 import { fetchAllCharactersForBrowse } from '../../lib/characterAttributesService'
 import { allRoleRatings, bestFitRoles } from '../../gameEngine/ratings'
 import { ROLES, ROLE_WEIGHTS } from '../../data/roleWeights'
+import { CHAMPION_STYLES, CHAMPION_STYLE_LABELS } from '../../data/championStyles'
 import {
   ATTRIBUTE_CATEGORIES,
   ATTRIBUTE_LABELS,
@@ -122,13 +123,14 @@ function CharacterHero({ character }) {
   }
 
   const attributes = character.attributes
-  const ratingsByRole = attributes ? allRoleRatings(attributes) : null
+  const style = character.fightingStyle
+  const ratingsByRole = attributes ? allRoleRatings(attributes, style) : null
   const roleRatingsList = ratingsByRole
     ? ROLES.map((r) => ({ id: r.id, label: r.label, rating: ratingsByRole[r.id] })).sort(
-        (a, b) => b.rating - a.rating
+        (a, b) => (b.rating ?? -1) - (a.rating ?? -1)
       )
     : []
-  const best = attributes ? bestFitRoles(attributes, ALL_ROLE_IDS, 1)[0] : null
+  const best = attributes ? bestFitRoles(attributes, ALL_ROLE_IDS, 1, style)[0] : null
 
   return (
     <motion.div
@@ -161,6 +163,15 @@ function CharacterHero({ character }) {
           {character.house && (
             <p className="text-sm text-got-parchment/50 italic mt-1" style={{ fontFamily: 'EB Garamond, serif' }}>
               House {character.house}
+            </p>
+          )}
+          {style ? (
+            <p className="text-xs text-got-parchment/40 mt-1" style={{ fontFamily: 'Cinzel, serif', letterSpacing: '0.05em' }}>
+              Style: <span className="text-got-parchment/70">{CHAMPION_STYLE_LABELS[style]}</span>
+            </p>
+          ) : (
+            <p className="text-xs text-got-red-bright/50 mt-1 italic" style={{ fontFamily: 'EB Garamond, serif' }}>
+              No fighting style set
             </p>
           )}
           {best && (
@@ -209,9 +220,13 @@ function CharacterHero({ character }) {
                 <span className={i === 0 ? 'text-got-gold' : 'text-got-parchment/70'} style={{ fontFamily: 'EB Garamond, serif' }}>
                   {r.label}
                 </span>
-                <span className={tierColor(r.rating)} style={{ fontFamily: 'Cinzel, serif' }}>
-                  {r.rating}% <span className="text-xs opacity-60">{tierLabel(r.rating)}</span>
-                </span>
+                {r.rating != null ? (
+                  <span className={tierColor(r.rating)} style={{ fontFamily: 'Cinzel, serif' }}>
+                    {r.rating}% <span className="text-xs opacity-60">{tierLabel(r.rating)}</span>
+                  </span>
+                ) : (
+                  <span className="text-stone-700 text-xs italic">no style set</span>
+                )}
               </div>
             ))}
           </div>
@@ -307,6 +322,7 @@ export default function Characters() {
   const [selectedId, setSelectedId] = useState(null)
   const [search, setSearch] = useState('')
   const [houseFilter, setHouseFilter] = useState('all')
+  const [styleFilter, setStyleFilter] = useState('all')
   const [missingOnly, setMissingOnly] = useState(false)
   const [sortKey, setSortKey] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
@@ -340,23 +356,24 @@ export default function Characters() {
 
   const rows = useMemo(() => {
     return characters.map((c) => {
-      const roleFits = c.attributes ? allRoleRatings(c.attributes) : null
+      const roleFits = c.attributes ? allRoleRatings(c.attributes, c.fightingStyle) : null
       return {
         ...c,
         roleFits,
-        bestFit: c.attributes ? bestFitRoles(c.attributes, ALL_ROLE_IDS, 1)[0] : null,
+        bestFit: c.attributes ? bestFitRoles(c.attributes, ALL_ROLE_IDS, 1, c.fightingStyle)[0] : null,
       }
     })
   }, [characters])
 
   const filtered = useMemo(() => {
     return rows.filter((c) => {
-      if (missingOnly && c.hasAttributes) return false
+      if (missingOnly && c.hasAttributes && c.hasFightingStyle) return false
       if (houseFilter !== 'all' && c.house !== houseFilter) return false
+      if (styleFilter !== 'all' && c.fightingStyle !== styleFilter) return false
       if (search.trim() && !c.name?.toLowerCase().includes(search.trim().toLowerCase())) return false
       return true
     })
-  }, [rows, missingOnly, houseFilter, search])
+  }, [rows, missingOnly, houseFilter, styleFilter, search])
 
   const sorted = useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1
@@ -364,6 +381,7 @@ export default function Characters() {
     const getValue = (c) => {
       if (sortKey === 'name') return c.name ?? ''
       if (sortKey === 'house') return c.house ?? ''
+      if (sortKey === 'style') return c.fightingStyle ? CHAMPION_STYLE_LABELS[c.fightingStyle] : ''
       if (sortKey === 'bestFit') return c.bestFit?.rating ?? -1
       if (ALL_ROLE_IDS.includes(sortKey)) return c.roleFits?.[sortKey] ?? -1
       if (ALL_ATTRIBUTE_KEYS.includes(sortKey)) return c.attributes?.[sortKey] ?? -1
@@ -433,6 +451,20 @@ export default function Characters() {
               {houses.map((h) => (
                 <option key={h} value={h}>
                   {h === 'all' ? 'All Houses' : h}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={styleFilter}
+              onChange={(e) => setStyleFilter(e.target.value)}
+              className="py-2 px-3 rounded border border-stone-700 bg-stone-900/60 text-got-parchment text-sm focus:outline-none focus:border-got-gold/50"
+              style={{ fontFamily: 'Cinzel, serif' }}
+            >
+              <option value="all">All Styles</option>
+              {CHAMPION_STYLES.map((s) => (
+                <option key={s} value={s}>
+                  {CHAMPION_STYLE_LABELS[s]}
                 </option>
               ))}
             </select>
@@ -507,6 +539,7 @@ export default function Characters() {
                 <tr className="border-b border-stone-800 bg-stone-900">
                   <SortHeader label="Name" sortKey="name" activeKey={sortKey} direction={sortDir} onSort={handleSort} sticky />
                   <SortHeader label="House" sortKey="house" activeKey={sortKey} direction={sortDir} onSort={handleSort} />
+                  <SortHeader label="Style" sortKey="style" activeKey={sortKey} direction={sortDir} onSort={handleSort} title="Champion fighting style" />
                   {ATTRIBUTE_COLUMNS.map((col) => (
                     <SortHeader
                       key={col.key}
@@ -569,6 +602,13 @@ export default function Characters() {
                       <td className="py-2.5 px-3 whitespace-nowrap text-got-parchment/50 text-sm" style={{ fontFamily: 'EB Garamond, serif' }}>
                         {c.house || '—'}
                       </td>
+                      <td className="py-2.5 px-3 whitespace-nowrap text-sm" style={{ fontFamily: 'EB Garamond, serif' }}>
+                        {c.fightingStyle ? (
+                          <span className="text-got-parchment/70">{CHAMPION_STYLE_LABELS[c.fightingStyle]}</span>
+                        ) : (
+                          <span className="text-got-red-bright/50 italic text-xs">unset</span>
+                        )}
+                      </td>
                       {ATTRIBUTE_COLUMNS.map((col) => (
                         <td
                           key={col.key}
@@ -584,19 +624,20 @@ export default function Characters() {
                       ))}
                       {ROLE_COLUMNS.map((col, i) => {
                         const value = c.roleFits?.[col.key]
+                        const hasValue = value != null
                         const isBest = c.bestFit?.roleId === col.key
                         return (
                           <td
                             key={col.key}
                             className={[
                               'py-2.5 px-3 text-right text-sm',
-                              value !== undefined ? tierColor(value) : 'text-stone-800',
+                              hasValue ? tierColor(value) : 'text-stone-800',
                               isBest ? 'bg-got-gold/5 font-bold' : '',
                               i === 0 ? 'border-l border-stone-900' : '',
                             ].join(' ')}
                             style={{ fontFamily: 'Cinzel, serif' }}
                           >
-                            {value !== undefined ? `${value}%` : '—'}
+                            {hasValue ? `${value}%` : '—'}
                           </td>
                         )
                       })}

@@ -12,6 +12,14 @@
  * net still lands on 1.0. roleRating() clamps the final result to 1-99
  * regardless, see gameEngine/ratings.js).
  *
+ * NOTE: Champion is NOT in ROLE_WEIGHTS. Unlike every other role, a
+ * single fixed formula for Champion punishes narrow specialists (a
+ * peak-Strength brawler loses purely for being weak on Speed/Stealth),
+ * which isn't what "best duelist" should mean. Champion's weights are
+ * keyed by fighting style instead — see data/championStyles.js. ROLES
+ * still lists champion as one of the 10 draftable roles; it just isn't a
+ * key in this file.
+ *
  * v2 changes from the original 10-role/8-attribute system:
  *   - Heir removed
  *   - Grand Maester added (knowledge/advisor role, Intelligence-driven)
@@ -24,6 +32,9 @@
  * it (e.g. a Maester's vow forswearing family ties). Kingsguard and
  * Champion were independently redesigned on top of this, not just
  * patched with a penalty.
+ *
+ * v4: Champion split into 5 fighting-style variants — see
+ * data/championStyles.js. No longer a flat entry in ROLE_WEIGHTS below.
  */
 
 export const ROLES = [
@@ -72,27 +83,24 @@ export const ROLES = [
       intimidation: 0.1,
     },
     masterOfWhispers: {
-      // Honour -10%: a spymaster too honorable to blackmail, deceive, or
-      // betray isn't an effective one — Varys works because he isn't
-      // burdened by it.
-      subterfuge: 0.3,
-      cunning: 0.25,
-      selfPreservation: 0.15,
+      subterfuge: 0.4,
+      cunning: 0.3,
+      selfPreservation: 0.2,
       stealth: 0.1,
       scholarship: 0.1,
       diplomacy: 0.1,
       intimidation: 0.1,
-      honour: -0.1,
+      honour: -0.3,
     },
     grandMaester: {
-      // Family -10%: the Maester's vow forswears family ties in service of
-      // the realm/order — a strong pull toward family undermines that.
-      scholarship: 0.45,
-      diplomacy: 0.15,
-      subterfuge: 0.15,
-      justice: 0.15,
-      willpower: 0.2,
-      family: -0.1,
+      scholarship: 0.7,
+      duty: 0.2,
+      justice: 0.1,
+      etiquette: 0.1,
+      diplomacy: 0.1,
+      willpower: 0.1,
+      technique: -0.1, 
+      family: -0.2,
     },
     masterOfCoin: {
       economy: 0.4,
@@ -103,9 +111,6 @@ export const ROLES = [
       subterfuge: 0.1,
     },
     masterOfLaws: {
-      // Subterfuge -10%: justice enforced through backroom scheming and
-      // manipulation undermines the rule of law itself — the law should be
-      // applied, not maneuvered.
       justice: 0.35,
       command: 0.2,
       intimidation: 0.15,
@@ -116,9 +121,6 @@ export const ROLES = [
       subterfuge: -0.1,
     },
     commander: {
-      // Self-Preservation -10%: a commander too worried about his own
-      // safety won't lead from the front, and troops notice — Robb/Jon
-      // inspire because they share the risk.
       strategy: 0.35,
       command: 0.25,
       battleMorale: 0.15,
@@ -139,12 +141,5 @@ export const ROLES = [
       intimidation: 0.05,
       honour: 0.05,
     },
-    // Also redesigned independently — no negative weight.
-    champion: {
-      technique: 0.5,
-      speed: 0.15,
-      stealth: 0.1,
-      strength: 0.15,
-      willpower: 0.1,
-    },
+    // champion intentionally omitted — see data/championStyles.js
   }

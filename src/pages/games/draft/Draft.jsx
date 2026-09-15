@@ -13,6 +13,7 @@ import {
   extractCouncilBattleInputs,
   extractCouncilEconomyInputs,
 } from '../../../gameEngine/battleEngine'
+import { canOfferDuelForBattle } from '../../../gameEngine/duelEngine'
 import { gatherIntelligence } from '../../../gameEngine/intelligence'
 import {
   createCampaign,
@@ -26,6 +27,7 @@ import RoleGrid from './RoleGrid'
 import DraftBoard from './DraftBoard'
 import Roster from './Roster'
 import CampaignAction from './CampaignAction'
+import DuelOffer from './DuelOffer'
 import Battle from './Battle'
 import BattleResult from './BattleResult'
 import CampaignVictory from './CampaignVictory'
@@ -54,7 +56,7 @@ function buildBattleSides(campaign, enemyHouse, scouted) {
 }
 
 export default function Draft() {
-  const [status, setStatus] = useState('loading') // loading | error | drafting | complete | campaignAction | battle | battleResult | campaignVictory
+  const [status, setStatus] = useState('loading') // loading | error | drafting | complete | campaignAction | duelOffer | battle | battleResult | campaignVictory
   const [error, setError] = useState(null)
   const [draftState, setDraftState] = useState(null)
   const [selectedCharacter, setSelectedCharacter] = useState(null)
@@ -127,19 +129,32 @@ export default function Draft() {
     }
   }, [draftState])
 
+  // Decides whether the duel offer is even reachable — canOfferDuelForBattle
+  // checks the same power-share threshold the enemy would need to be
+  // dominated by before considering single combat instead of open battle.
+  // Uses `resources` straight from the campaign-action result rather than
+  // waiting on the setCampaign() above to land, since React state updates
+  // aren't synchronous and the duel check needs this battle's real numbers
+  // immediately.
   const handleCampaignActionComplete = useCallback(
     ({ resources, scouted: didScout, intelReport: report }) => {
-      setCampaign((prev) => ({ ...prev, resources }))
+      const updatedCampaign = { ...campaign, resources }
+      setCampaign(updatedCampaign)
       setScouted(didScout)
       setIntelReport(report)
-      setStatus('battle')
+
+      const { yourSide, enemySide } = buildBattleSides(updatedCampaign, enemyHouse, didScout)
+      setStatus(canOfferDuelForBattle(yourSide, enemySide) ? 'duelOffer' : 'battle')
     },
-    []
+    [campaign, enemyHouse]
   )
 
   // Battle.jsx now owns the entire live fight internally (ticking army
   // counts, mid-fight strategy switches, surrender) and only calls this
-  // once, when the fight is actually decided.
+  // once, when the fight is actually decided. DuelOffer calls the exact
+  // same handler with the exact same result shape (finalizeDuelResult
+  // mirrors finalizeBattleResult) — this function doesn't need to know
+  // which one happened.
   const handleBattleComplete = useCallback((finalResult) => {
     setBattleResult(finalResult)
     setStatus('battleResult')
@@ -148,7 +163,10 @@ export default function Draft() {
   // Campaign/enemyHouse (and any campaign-action spend) are untouched by a
   // failed attempt (results are only committed via handleContinue/
   // handleClaimVictory) — so retrying just goes back to the battle screen,
-  // keeping whatever intel/recruits you already have for this fight.
+  // keeping whatever intel/recruits you already have for this fight. A
+  // duel loss also routes here on "Try Again" — retrying always goes to
+  // the normal Battle screen, not back to the duel offer, since the whole
+  // point of a retry is falling back to the safer option.
   const handleRetry = useCallback(() => {
     setStatus('battle')
   }, [])
@@ -237,6 +255,29 @@ export default function Draft() {
           enemyHouse={enemyHouse}
           economyInputs={economyInputs}
           onComplete={handleCampaignActionComplete}
+        />
+      </PageWrapper>
+    )
+  }
+
+  if (status === 'duelOffer') {
+    const { enemySide } = buildBattleSides(campaign, enemyHouse, scouted)
+    return (
+      <PageWrapper className="justify-start">
+        <div className="w-full max-w-sm pt-4">
+          <p
+            className="text-stone-600 text-xs tracking-[0.3em] uppercase text-center"
+            style={{ fontFamily: 'Cinzel, serif' }}
+          >
+            Battle {campaign.battleNumber} of {TOTAL_BATTLES}
+          </p>
+        </div>
+        <DuelOffer
+          roster={campaign.roster}
+          enemyHouse={enemyHouse}
+          enemySide={enemySide}
+          onDuel={handleBattleComplete}
+          onDecline={() => setStatus('battle')}
         />
       </PageWrapper>
     )

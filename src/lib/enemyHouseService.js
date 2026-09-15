@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { SELECT_COLUMNS, mapAttributeRow, mapFightingStyle } from './characterAttributesService'
 
 function normalizeEnemyHouse(row) {
   return {
@@ -47,4 +48,52 @@ export async function fetchRandomEnemyHouse(tier = null, excludeIds = []) {
 
   const random = Math.floor(Math.random() * candidates.length)
   return normalizeEnemyHouse(candidates[random])
+}
+
+/**
+ * Fetch the duel-eligible champions for one enemy house (via
+ * enemy_house_champions — migration 007). Returns an array, which can be
+ * empty for houses with no lore-matching roster character — that's
+ * expected, not an error. See duelEngine.js's getEnemyDuelFighter(),
+ * which falls back to a procedural fighter in that case.
+ *
+ * Deliberately doesn't re-fetch the house itself — callers already have
+ * it from fetchRandomEnemyHouse() and can pass its id straight in.
+ */
+export async function fetchEnemyHouseChampions(enemyHouseId) {
+  const { data, error } = await supabase
+    .from('enemy_house_champions')
+    .select(
+      `
+      characters (
+        api_id,
+        name,
+        fighting_style,
+        character_attributes ( ${SELECT_COLUMNS} )
+      )
+    `
+    )
+    .eq('enemy_house_id', enemyHouseId)
+
+  if (error) {
+    throw new Error(`Failed to fetch enemy house champions: ${error.message}`)
+  }
+
+  return (data ?? [])
+    .map((row) => row.characters)
+    .filter(Boolean)
+    .map((c) => {
+      const attrRow = Array.isArray(c.character_attributes) ? c.character_attributes[0] : c.character_attributes
+      return {
+        id: c.api_id,
+        name: c.name,
+        attributes: mapAttributeRow(attrRow),
+        fightingStyle: mapFightingStyle(c.fighting_style),
+      }
+    })
+    // A champion candidate needs both attributes and a fighting style to
+    // actually be duel-usable — exclude any that are somehow missing
+    // either (shouldn't happen for the curated 007 list, but this
+    // service should never hand the engine a character it can't rate).
+    .filter((c) => c.attributes && c.fightingStyle)
 }

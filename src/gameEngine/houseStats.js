@@ -13,6 +13,12 @@
  * merged into Commander, Grand Maester and Champion added). Note that
  * Commander→battleMorale is deliberately used in both Military and
  * Morale — a Commander's ability to rally the army is relevant to both.
+ *
+ * v3: Champion's contribution now needs the character's fightingStyle
+ * (see ratings.js/championStyles.js). Guarded defensively — if a drafted
+ * Champion somehow lacks a style, they're excluded from the Military
+ * average rather than throwing and breaking the whole stats screen,
+ * matching this function's existing tolerance for missing contributors.
  */
 
 import { effectiveAttribute } from './ratings'
@@ -73,7 +79,12 @@ export function computeHouseStats(roster) {
     const values = contributors
       .map(({ role, attr }) => {
         const character = byRole[role]
-        return character ? effectiveAttribute(character.attributes, role, attr) : null
+        if (!character) return null
+        // Champion needs a fighting style to have a computable rating at
+        // all — if this specific character somehow lacks one, skip their
+        // contribution rather than letting effectiveAttribute() throw.
+        if (role === 'champion' && !character.fightingStyle) return null
+        return effectiveAttribute(character.attributes, role, attr, character.fightingStyle)
       })
       .filter((v) => v !== null)
 

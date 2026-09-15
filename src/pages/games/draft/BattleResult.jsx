@@ -13,6 +13,7 @@ export default function BattleResult({
   onClaimVictory,
 }) {
   const won = result.outcome === 'victory'
+  const viaDuel = Boolean(result.viaDuel)
 
   return (
     <div className="w-full max-w-sm flex flex-col gap-6 pt-4 pb-4">
@@ -20,7 +21,7 @@ export default function BattleResult({
         <p className="text-stone-600 text-xs tracking-[0.3em] uppercase" style={{ fontFamily: 'Cinzel, serif' }}>
           Battle {battleNumber} of {totalBattles}
         </p>
-        <div className="text-6xl mb-2 mt-1 select-none">{won ? '⚔️' : '🏳️'}</div>
+        <div className="text-6xl mb-2 mt-1 select-none">{viaDuel ? '🗡️' : won ? '⚔️' : '🏳️'}</div>
         <h1
           className="text-3xl font-black tracking-wider uppercase"
           style={{
@@ -29,11 +30,39 @@ export default function BattleResult({
             textShadow: won ? '0 0 30px rgba(201,168,76,0.4)' : '0 0 30px rgba(192,57,43,0.5)',
           }}
         >
-          {won ? 'Victory' : 'Defeat'}
+          {viaDuel ? (won ? 'Single Combat Won' : 'Single Combat Lost') : won ? 'Victory' : 'Defeat'}
         </h1>
         <p className="text-stone-500 text-sm mt-1">vs {enemyHouse.name}</p>
         <div className="gold-divider mt-3" />
       </div>
+
+      {/* Duel-specific summary — replaces the normal casualty breakdown,
+          since "0 casualties, enemy's whole army surrendered" reads as
+          confusing rather than informative for a fight that never
+          actually happened army-to-army. */}
+      {viaDuel && (
+        <div
+          className={[
+            'rounded-lg border p-4 flex flex-col gap-2 text-center',
+            won ? 'border-got-gold/40 bg-got-gold/5' : 'border-got-red/40 bg-got-red/5',
+          ].join(' ')}
+        >
+          <p className="text-got-parchment text-base" style={{ fontFamily: 'EB Garamond, serif' }}>
+            <span className="text-got-gold font-bold">{result.duelYourFighter}</span> faced{' '}
+            <span className="text-got-red-bright font-bold">{result.duelEnemyFighter}</span> in single combat.
+          </p>
+          {result.duelReason && (
+            <p className="text-stone-500 text-sm italic" style={{ fontFamily: 'EB Garamond, serif' }}>
+              {result.duelReason}
+            </p>
+          )}
+          <p className="text-stone-400 text-sm mt-1" style={{ fontFamily: 'EB Garamond, serif' }}>
+            {won
+              ? `${enemyHouse.name} yields — their army stands down without a fight.`
+              : 'Your champion has fallen. The battle is lost with them.'}
+          </p>
+        </div>
+      )}
 
       {/* Enemy house revealed — hidden during the fight, revealed now that it's over */}
       <div className="rounded-lg border border-got-red/30 bg-got-red/5 p-4 flex flex-col gap-2">
@@ -74,22 +103,27 @@ export default function BattleResult({
         )}
       </div>
 
-      <div className="rounded-lg border border-stone-700 bg-stone-900/60 p-4 flex flex-col gap-2">
-        <div className="flex justify-between">
-          <span className="text-stone-500 text-sm">Your casualties</span>
-          <span className="text-got-parchment font-bold">{result.yourCasualties.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-stone-500 text-sm">Enemy casualties</span>
-          <span className="text-got-parchment font-bold">{result.enemyCasualties.toLocaleString()}</span>
-        </div>
-        {result.enemySurrendered > 0 && (
+      {/* Normal casualty breakdown — skipped for a duel, since armies
+          never actually fought and the raw numbers (0 vs their whole
+          army) would just be confusing next to the duel summary above. */}
+      {!viaDuel && (
+        <div className="rounded-lg border border-stone-700 bg-stone-900/60 p-4 flex flex-col gap-2">
           <div className="flex justify-between">
-            <span className="text-stone-500 text-sm">Enemy surrendered</span>
-            <span className="text-got-gold-light font-bold">{result.enemySurrendered.toLocaleString()}</span>
+            <span className="text-stone-500 text-sm">Your casualties</span>
+            <span className="text-got-parchment font-bold">{result.yourCasualties.toLocaleString()}</span>
           </div>
-        )}
-      </div>
+          <div className="flex justify-between">
+            <span className="text-stone-500 text-sm">Enemy casualties</span>
+            <span className="text-got-parchment font-bold">{result.enemyCasualties.toLocaleString()}</span>
+          </div>
+          {result.enemySurrendered > 0 && (
+            <div className="flex justify-between">
+              <span className="text-stone-500 text-sm">Enemy surrendered</span>
+              <span className="text-got-gold-light font-bold">{result.enemySurrendered.toLocaleString()}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="rounded-lg border border-stone-700 bg-stone-900/40 p-4 flex flex-col gap-2">
         {result.soldiersGained > 0 && (
@@ -100,7 +134,7 @@ export default function BattleResult({
           {result.moraleChange >= 0 ? '+' : ''}
           {result.moraleChange} morale
         </p>
-        <p className="text-got-red-bright text-sm">{result.supplyChange} supply</p>
+        {result.supplyChange !== 0 && <p className="text-got-red-bright text-sm">{result.supplyChange} supply</p>}
       </div>
 
       {!won && campaignSummary && (

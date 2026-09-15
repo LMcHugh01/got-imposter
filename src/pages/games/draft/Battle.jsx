@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { tickBattle, finalizeBattleResult, STRATEGIES } from '../../../gameEngine/battleEngine'
+import { computeDuelShare, DUEL_SHARE_THRESHOLD } from '../../../gameEngine/duelEngine'
+import { SHOW_DEBUG_NUMBERS } from '../../../config/features'
 
 const TICK_INTERVAL_MS = 550
 
@@ -81,6 +83,11 @@ export default function Battle({ yourSide, enemySide, enemyArmyRange, onComplete
   }
 
   if (phase === 'strategy') {
+    // Debug-only — shows the ACTUAL computed power share and how it
+    // compares to the duel-offer threshold, so "why didn't I get offered
+    // a duel" is directly visible instead of something to infer.
+    const duelShare = SHOW_DEBUG_NUMBERS ? computeDuelShare(yourSide, enemySide) : null
+
     return (
       <div className="w-full max-w-sm flex flex-col gap-6 pt-4 pb-4">
         <div className="text-center">
@@ -119,6 +126,12 @@ export default function Battle({ yourSide, enemySide, enemyArmyRange, onComplete
             </p>
           </div>
         </div>
+
+        {duelShare !== null && (
+          <p className="text-stone-600 text-xs text-center">
+            Power share: {Math.round(duelShare * 100)}% (duel offered at {Math.round(DUEL_SHARE_THRESHOLD * 100)}%+)
+          </p>
+        )}
 
         <div className="flex flex-col gap-2">
           <p

@@ -7,10 +7,12 @@
  * state object, so it's safe to use directly as React state later.
  *
  * A "character" here is expected to look like:
- *   { id: <unique id>, name: <string>, house: <string|null>, attributes: {8 stats} }
+ *   { id, name, house, attributes: {23 stats}, fightingStyle }
  * i.e. the joined shape of a characters + character_attributes row. Where
  * that join happens (characterAttributesService.js) is outside this file's
- * concern — this engine only cares about the shape above.
+ * concern — this engine only cares about the shape above. fightingStyle
+ * is only meaningful for Champion (see ratings.js) — every other role
+ * ignores it.
  */
 
 import { ROLES } from '../data/roleWeights'
@@ -82,21 +84,32 @@ export function offerCharacters(state, rng = Math.random) {
 
 /**
  * Step B (§5.2) — once a character is picked, their fit % against every
- * still-open role, sorted best-first to help the player choose.
+ * still-open role, sorted best-first to help the player choose. If
+ * Champion is open but the character has no fightingStyle yet (shouldn't
+ * happen once the full roster is tagged, but defensively), its fit shows
+ * as null rather than crashing the pick screen.
  */
 export function getRoleOptionsForCharacter(state, character) {
   return getOpenRoles(state)
-    .map((role) => ({
-      roleId: role.id,
-      label: role.label,
-      fit: roleRating(character.attributes, role.id),
-    }))
-    .sort((a, b) => b.fit - a.fit)
+    .map((role) => {
+      if (role.id === 'champion' && !character.fightingStyle) {
+        return { roleId: role.id, label: role.label, fit: null }
+      }
+      return {
+        roleId: role.id,
+        label: role.label,
+        fit: roleRating(character.attributes, role.id, character.fightingStyle),
+      }
+    })
+    .sort((a, b) => (b.fit ?? -1) - (a.fit ?? -1))
 }
 
 /**
  * Locks a character into a role, advances the round. Returns a new state;
- * does not mutate the one passed in.
+ * does not mutate the one passed in. Deliberately strict here (unlike the
+ * Step B preview above) — actually assigning an untagged character to
+ * Champion throws, since that's a real data gap that should surface
+ * immediately rather than lock in a wrong/missing rating.
  */
 export function assignRole(state, character, roleId) {
   if (state.draftedCharacterIds.has(character.id)) {
@@ -109,7 +122,7 @@ export function assignRole(state, character, roleId) {
     throw new Error(`Role "${roleId}" is already filled.`)
   }
 
-  const fit = roleRating(character.attributes, roleId)
+  const fit = roleRating(character.attributes, roleId, character.fightingStyle)
 
   return {
     ...state,
