@@ -225,41 +225,28 @@ export default function CampaignAction({ resources, enemyHouse, economyInputs, o
     )
   }
 
+  // Full figures (army/morale/quality/supply ranges, possible formations
+  // and terrain) now live permanently in the Enemy Scout Report section
+  // of the dashboard, not repeated inline here — this just confirms the
+  // report updated and hands the player straight to it.
   if (view === 'intelligence') {
     return (
-      <div className="w-full max-w-sm flex flex-col gap-4 pt-4 pb-4">
-        <div className="text-center">
+      <div className="w-full max-w-sm flex flex-col gap-6 pt-4 pb-4 text-center">
+        <div className="text-6xl select-none">🦅</div>
+        <div>
           <h2 className="text-2xl font-bold text-got-gold tracking-wide" style={{ fontFamily: 'Cinzel, serif' }}>
-            Scouting Report
+            Enemy Scout Report Updated
           </h2>
-          <div className="gold-divider mt-3" />
-        </div>
-        <div className="rounded-lg border border-stone-700 bg-stone-900/60 p-4 flex flex-col gap-2">
-          <div className="flex justify-between">
-            <span className="text-stone-500 text-sm">Enemy army</span>
-            <span className="text-got-parchment">
-              {intelReport.armyRangeLow.toLocaleString()}–{intelReport.armyRangeHigh.toLocaleString()}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-stone-500 text-sm">Morale</span>
-            <span className="text-got-parchment">
-              {intelReport.moraleRangeLow}–{intelReport.moraleRangeHigh}
-            </span>
-          </div>
-          <div className="flex justify-between items-start">
-            <span className="text-stone-500 text-sm">Could be</span>
-            <span className="text-got-parchment capitalize text-right">
-              {intelReport.personalityShortlist.join(' / ')}
-            </span>
-          </div>
+          <p className="text-stone-500 text-sm mt-2 italic" style={{ fontFamily: 'EB Garamond, serif' }}>
+            Your ravens have returned. The figures below now reflect what they found.
+          </p>
         </div>
         <button
           onClick={handleContinueAfterAction}
           className="w-full py-4 rounded border border-got-gold bg-got-gold/10 text-got-gold text-lg tracking-widest uppercase hover:bg-got-gold/20"
           style={{ fontFamily: 'Cinzel, serif' }}
         >
-          Continue to Battle
+          View Scout Report
         </button>
       </div>
     )

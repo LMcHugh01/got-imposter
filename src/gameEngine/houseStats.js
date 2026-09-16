@@ -23,7 +23,11 @@
 
 import { effectiveAttribute } from './ratings'
 
-const STAT_CONTRIBUTORS = {
+// Exported so the dashboard's stat-breakdown modal can show exactly
+// which role/attribute pairs feed a given stat, straight off the same
+// config computeHouseStats() itself reads — one source of truth, no
+// second hand-maintained copy of "what feeds Military."
+export const STAT_CONTRIBUTORS = {
   military: [
     { role: 'commander', attr: 'strategy' },
     { role: 'commander', attr: 'battleMorale' },

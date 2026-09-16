@@ -10,11 +10,6 @@ import {
   isDraftComplete,
   getFinalRoster,
 } from '../../../gameEngine/draftEngine'
-import {
-  extractCouncilBattleInputs,
-  extractCouncilEconomyInputs,
-} from '../../../gameEngine/battleEngine'
-import { canOfferDuelForBattle } from '../../../gameEngine/duelEngine'
 import { gatherIntelligence } from '../../../gameEngine/intelligence'
 import {
   createCampaign,
@@ -24,60 +19,19 @@ import {
   summarizeCampaign,
   TOTAL_BATTLES,
 } from '../../../gameEngine/campaign'
+import { buildBattleSides } from './battleSides'
 import RoleGrid from './RoleGrid'
 import DraftBoard from './DraftBoard'
 import DraftOathModal from './DraftOathModal'
 import DraftLedger from './DraftLedger'
 import Roster from './Roster'
-import CampaignAction from './CampaignAction'
-import DuelOffer from './DuelOffer'
+import CampaignDashboard from './CampaignDashboard'
 import Battle from './Battle'
 import BattleResult from './BattleResult'
 import CampaignVictory from './CampaignVictory'
 
-function troopTotal(troops) {
-  return troops.infantry + troops.archers + troops.cavalry
-}
-
-function buildBattleSides(campaign, enemyHouse, scouted) {
-  const councilInputs = extractCouncilBattleInputs(campaign.roster)
-  const yourSide = {
-    troops: campaign.resources.troops,
-    // Kept alongside `troops` for duelEngine.js's computeDuelShare, which
-    // calls computeYourPower/computeEnemyPower directly and reads
-    // .armySize itself — tickBattle derives this the same way
-    // internally, but that derivation lives inside tickBattle now that
-    // composition exists, not on the object passed in.
-    armySize: troopTotal(campaign.resources.troops),
-    armyQuality: campaign.resources.armyQuality,
-    morale: campaign.resources.morale,
-    supply: campaign.resources.supply,
-    ...councilInputs,
-    scouted,
-  }
-  const enemySide = {
-    troops: enemyHouse.troops,
-    armySize: troopTotal(enemyHouse.troops),
-    armyQuality: enemyHouse.armyQuality,
-    morale: enemyHouse.morale,
-    supply: enemyHouse.supply,
-    rating: enemyHouse.rating,
-    gold: enemyHouse.gold,
-    name: enemyHouse.name,
-    flavorText: enemyHouse.flavorText,
-    // BATTLE_PLAN.md §10 — the battle happens on the enemy's terrain;
-    // enemyHouseService.js already falls back to a neutral default for
-    // any house that predates the terrain migration.
-    terrain: enemyHouse.terrain,
-    // BATTLE_PLAN.md §12 — resolved into a concrete battle AI profile by
-    // Battle.jsx, once per engagement.
-    personality: enemyHouse.personality,
-  }
-  return { yourSide, enemySide }
-}
-
 export default function Draft() {
-  const [status, setStatus] = useState('loading') // loading | error | drafting | complete | campaignAction | duelOffer | battle | battleResult | campaignVictory
+  const [status, setStatus] = useState('loading') // loading | error | drafting | complete | dashboard | battle | battleResult | campaignVictory
   const [error, setError] = useState(null)
   const [draftState, setDraftState] = useState(null)
   const [selectedCharacter, setSelectedCharacter] = useState(null)
@@ -95,6 +49,11 @@ export default function Draft() {
   const [battleResult, setBattleResult] = useState(null)
   const [scouted, setScouted] = useState(false)
   const [intelReport, setIntelReport] = useState(null)
+  // Set by CampaignDashboard's Battle Tactics panel the moment the player
+  // commits to an opening move — { formationId, strategyId } for a fresh
+  // attempt, or null when resuming a retreated engagement (Battle.jsx
+  // pulls formation/tick-count from `engagement` in that case instead).
+  const [battleStart, setBattleStart] = useState(null)
   // Retreat-and-reattempt (BATTLE_PLAN.md §15) — one continuous engagement
   // you can pause and resume, not two separate battles. `engagement` is
   // null for a fresh fight; once set (via handleRetreat), it carries the
@@ -195,47 +154,40 @@ export default function Draft() {
       setEnemyHouse(house)
       setScouted(false)
       setIntelReport(null)
-      setStatus('campaignAction')
+      setBattleStart(null)
+      setStatus('dashboard')
     } catch (err) {
       setError(err.message)
       setStatus('error')
     }
   }, [draftState])
 
-  // Decides whether the duel offer is even reachable — canOfferDuelForBattle
-  // checks the same power-share threshold the enemy would need to be
-  // dominated by before considering single combat instead of open battle.
-  // Uses `resources` straight from the campaign-action result rather than
-  // waiting on the setCampaign() above to land, since React state updates
-  // aren't synchronous and the duel check needs this battle's real numbers
-  // immediately.
-  const handleCampaignActionComplete = useCallback(
-    ({ resources, scouted: didScout, intelReport: report }) => {
-      const updatedCampaign = { ...campaign, resources }
-      setCampaign(updatedCampaign)
-      setScouted(didScout)
-      setIntelReport(report)
+  // Fired by CampaignDashboard whenever a pre-battle action resolves (or
+  // is skipped) inside its modal. No navigation here — the dashboard
+  // stays put; it just commits the updated resources/intel into campaign
+  // state so the persistent Council/Resources panels and the Battle
+  // Tactics power-share numbers immediately reflect it.
+  const handleActionComplete = useCallback(({ resources, scouted: didScout, intelReport: report }) => {
+    setCampaign((c) => ({ ...c, resources }))
+    setScouted(didScout)
+    setIntelReport(report)
+  }, [])
 
-      // A duel replaces the fight outright — doesn't make sense to offer
-      // one when resuming an engagement you already committed to open
-      // battle on and retreated from mid-fight.
-      if (engagement) {
-        setStatus('battle')
-        return
-      }
-
-      const { yourSide, enemySide } = buildBattleSides(updatedCampaign, enemyHouse, didScout)
-      setStatus(canOfferDuelForBattle(yourSide, enemySide) ? 'duelOffer' : 'battle')
-    },
-    [campaign, enemyHouse, engagement]
-  )
+  // Fired by CampaignDashboard's Battle Tactics panel once the player
+  // commits to an opening move (or, when resuming a retreated engagement,
+  // just to "Resume Battle" — strategyId is null in that case, and
+  // Battle.jsx pulls its formation/tick-count from `engagement` instead).
+  const handleMarchToBattle = useCallback((formationId, strategyId) => {
+    setBattleStart(strategyId ? { formationId, strategyId } : null)
+    setStatus('battle')
+  }, [])
 
   // Battle.jsx now owns the entire live fight internally (ticking army
   // counts, mid-fight strategy switches, surrender) and only calls this
-  // once, when the fight is actually decided. DuelOffer calls the exact
-  // same handler with the exact same result shape (finalizeDuelResult
-  // mirrors finalizeBattleResult) — this function doesn't need to know
-  // which one happened.
+  // once, when the fight is actually decided. The Duel Offer panel on the
+  // dashboard calls the exact same handler with the exact same result
+  // shape (finalizeDuelResult mirrors finalizeBattleResult) — this
+  // function doesn't need to know which one happened.
   const handleBattleComplete = useCallback((finalResult) => {
     setBattleResult(finalResult)
     setEngagement(null)
@@ -246,26 +198,26 @@ export default function Draft() {
   // Retreat (BATTLE_PLAN.md §15) — deliberately does NOT call
   // recordBattleResult: no battleLog entry, battleNumber doesn't advance,
   // enemyHouse isn't added to usedEnemyHouseIds. It's a pause, not a
-  // result. Routes to a fresh campaignAction window (a real second
-  // pre-battle action, using whatever resources are left) rather than
-  // straight back to Battle, then resumes from the persisted counts.
+  // result. Routes back to the dashboard for a fresh pre-battle action
+  // window (using whatever resources are left) rather than straight back
+  // to Battle, then resumes from the persisted counts.
   const handleRetreat = useCallback(({ yourTroops, enemyTroops, enemyCumulativeCasualties, rallyUsed, formationId, ticksElapsed, enemyProfile }) => {
     setEngagement({ yourTroops, enemyTroops, enemyCumulativeCasualties, formationId, ticksElapsed, enemyProfile })
     setRallyUsedThisEngagement(rallyUsed)
     setScouted(false)
     setIntelReport(null)
-    setStatus('campaignAction')
+    setBattleStart(null)
+    setStatus('dashboard')
   }, [])
 
   // Campaign/enemyHouse (and any campaign-action spend) are untouched by a
   // failed attempt (results are only committed via handleContinue/
-  // handleClaimVictory) — so retrying just goes back to the battle screen,
-  // keeping whatever intel/recruits you already have for this fight. A
-  // duel loss also routes here on "Try Again" — retrying always goes to
-  // the normal Battle screen, not back to the duel offer, since the whole
-  // point of a retry is falling back to the safer option.
+  // handleClaimVictory) — so retrying just goes back to the dashboard to
+  // pick tactics again, keeping whatever intel/recruits you already have
+  // for this fight. A duel loss also routes here on "Try Again".
   const handleRetry = useCallback(() => {
-    setStatus('battle')
+    setBattleStart(null)
+    setStatus('dashboard')
   }, [])
 
   const handleContinue = useCallback(async () => {
@@ -277,7 +229,8 @@ export default function Draft() {
       setEnemyHouse(house)
       setScouted(false)
       setIntelReport(null)
-      setStatus('campaignAction')
+      setBattleStart(null)
+      setStatus('dashboard')
     } catch (err) {
       setError(err.message)
       setStatus('error')
@@ -335,51 +288,18 @@ export default function Draft() {
     )
   }
 
-  if (status === 'campaignAction') {
-    const economyInputs = extractCouncilEconomyInputs(campaign.roster)
+  if (status === 'dashboard') {
     return (
       <PageWrapper className="justify-start">
-        <div className="w-full max-w-sm pt-4">
-          <p
-            className="text-stone-600 text-xs tracking-[0.3em] uppercase text-center"
-            style={{ fontFamily: 'Cinzel, serif' }}
-          >
-            Battle {campaign.battleNumber} of {TOTAL_BATTLES}
-          </p>
-          {engagement && (
-            <p className="text-got-gold/60 text-xs text-center mt-1 italic" style={{ fontFamily: 'EB Garamond, serif' }}>
-              You have regrouped. Choose another action before returning to the field.
-            </p>
-          )}
-        </div>
-        <CampaignAction
-          resources={campaign.resources}
+        <CampaignDashboard
+          campaign={campaign}
           enemyHouse={enemyHouse}
-          economyInputs={economyInputs}
-          onComplete={handleCampaignActionComplete}
-        />
-      </PageWrapper>
-    )
-  }
-
-  if (status === 'duelOffer') {
-    const { enemySide } = buildBattleSides(campaign, enemyHouse, scouted)
-    return (
-      <PageWrapper className="justify-start">
-        <div className="w-full max-w-sm pt-4">
-          <p
-            className="text-stone-600 text-xs tracking-[0.3em] uppercase text-center"
-            style={{ fontFamily: 'Cinzel, serif' }}
-          >
-            Battle {campaign.battleNumber} of {TOTAL_BATTLES}
-          </p>
-        </div>
-        <DuelOffer
-          roster={campaign.roster}
-          enemyHouse={enemyHouse}
-          enemySide={enemySide}
-          onDuel={handleBattleComplete}
-          onDecline={() => setStatus('battle')}
+          engagement={engagement}
+          scouted={scouted}
+          intelReport={intelReport}
+          onActionComplete={handleActionComplete}
+          onMarch={handleMarchToBattle}
+          onDuelResult={handleBattleComplete}
         />
       </PageWrapper>
     )
@@ -413,6 +333,8 @@ export default function Draft() {
           engagement={engagement}
           canRetreat={!engagement}
           rallyAvailable={!rallyUsedThisEngagement}
+          initialFormationId={battleStart?.formationId ?? null}
+          initialStrategyId={battleStart?.strategyId ?? null}
         />
       </PageWrapper>
     )

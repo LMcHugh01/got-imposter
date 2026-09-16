@@ -325,6 +325,11 @@ export const TERRAIN_FORMATION_AFFINITY = {
   riverlands: { favors: ['shieldWall'], penalizes: ['cavalryVanguard'] },
   snowfields: { favors: ['shieldWall'], penalizes: [] },
 }
+
+// Exported so intelligence.js can build a fogged terrain shortlist the
+// same way it already does for personality — this is simply "every
+// terrain that could apply", not a new concept.
+export const TERRAIN_TYPES = Object.keys(TERRAIN_FORMATION_AFFINITY)
 const TERRAIN_FAVOR_MULTIPLIER = 1.5
 const TERRAIN_PENALTY_MULTIPLIER = 0.5
 
@@ -405,7 +410,11 @@ const CHARGE_CAVALRY_VULNERABILITY_PENALTY = -0.2
 // Taken is casualties the enemy itself suffers (scales enemyCasualtyRate)
 // — same slot resolveStrategyModifiers already occupies, just fixed for
 // the whole fight instead of live-chosen.
-const PERSONALITY_PROFILES = {
+// Exported so the pre-battle UI (Enemy House Overview) can derive "which
+// formations/tendencies are possible" straight from the same
+// personality->profile mapping the battle AI itself resolves against,
+// rather than a second, hand-maintained copy of this table.
+export const PERSONALITY_PROFILES = {
   aggressive: { formationId: 'cavalryVanguard', dealtMultiplier: 1.2, takenMultiplier: 1.15, breakThresholdMultiplier: 1.0 },
   defensive: { formationId: 'shieldWall', dealtMultiplier: 0.9, takenMultiplier: 0.8, breakThresholdMultiplier: 1.15 },
   // Protective of its own forces — breaks/retreats early (§12).

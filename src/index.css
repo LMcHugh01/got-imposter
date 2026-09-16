@@ -5,7 +5,12 @@
   --font-cinzel-decorative: 'Cinzel Decorative', serif;
   --font-garamond: 'EB Garamond', serif;
 
-  --color-got-black: #0a0a0a;
+  --background-image-got: radial-gradient(
+    ellipse 60% 50% at 50% 0%,
+    rgba(201, 168, 76, 0.1) 0%,
+    #111111 100%
+  );
+
   --color-got-charcoal: #1a1a1a;
   --color-got-dark: #111111;
   --color-got-gold: #c9a84c;
@@ -17,7 +22,6 @@
   --color-got-parchment-dark: #e8d5a3;
   --color-got-stone: #3a3a3a;
 }
-
 * {
   box-sizing: border-box;
 }

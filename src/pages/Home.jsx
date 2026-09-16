@@ -1,110 +1,137 @@
-import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import PageWrapper from '../components/PageWrapper'
 import GameCard from '../components/GameCard'
-
-const GAMES = [
-  { icon: '🎭', title: 'Imposter', description: "Find the imposter before it's too late.", to: '/games/imposter' },
-  { icon: '⚔', title: 'Draft', description: 'Build your house. Conquer Westeros.', to: '/games/draft' },
-  { icon: '🧠', title: 'Who Am I?', description: 'Identify the character from the clues.', comingSoon: true },
-  { icon: '❓', title: 'Trivia', description: 'Test your knowledge of Westeros.', comingSoon: true },
-]
-
-const EXPLORE = [
-  { icon: '📜', title: 'Characters', description: 'The people of Westeros.', comingSoon: true },
-  { icon: '🏰', title: 'Houses', description: 'The great houses of the realm.', comingSoon: true },
-]
+import { FaMasksTheater, FaCrown } from "react-icons/fa6";
+import { 
+  GiCrossedSwords, 
+  GiSpy,
+  GiScrollUnfurled, 
+  GiQuillInk, 
+  GiCastle 
+} from 'react-icons/gi'
 
 export default function Home() {
   return (
-    <PageWrapper className="justify-start">
-      <div className="relative z-10 flex flex-col items-center gap-10 max-w-sm w-full">
-        {/* Hero */}
-        <div className="flex flex-col items-center gap-6 pt-4 text-center">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
-            className="text-6xl select-none"
-          >
-            👑
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.15, ease: 'easeOut' }}
-          >
-            <h1
-              className="text-3xl font-black tracking-widest uppercase text-got-gold leading-tight"
-              style={{ fontFamily: 'Cinzel Decorative, serif' }}
+    /* bg-got-black loads your top-center golden ambient radial glow overlay */
+    <div className="bg-got-black min-h-screen text-got-parchment flex flex-col justify-between overflow-x-hidden selection:bg-got-gold/30 selection:text-white">
+      
+      <PageWrapper className="justify-start pt-12 pb-16 flex-grow z-10">
+        <div className="relative z-10 flex flex-col items-center gap-12 max-w-2xl w-full mx-auto px-4">
+          
+          {/* Hero Header */}
+          <div className="flex flex-col items-center gap-4 pt-4 text-center">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, ease: 'easeOut' }}
+              className="text-4xl text-got-gold select-none filter drop-shadow-[0_0_12px_rgba(201,168,76,0.3)]"
             >
-              Game of Thrones
-            </h1>
-            <div className="gold-divider my-3" />
+              <FaCrown />
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.15, ease: 'easeOut' }}
+            >
+              <h1
+                className="text-4xl md:text-5xl font-black tracking-[0.2em] uppercase text-got-gold leading-tight drop-shadow-md"
+                style={{ fontFamily: 'Cinzel Decorative, serif' }}
+              >
+                Westerosi Games
+              </h1>
+              <div className="gold-divider my-4 h-[1px] w-32 mx-auto bg-gradient-to-r from-transparent via-got-gold/40 to-transparent" />
+              <p
+                className="text-xs md:text-sm tracking-[0.3em] uppercase text-got-parchment/60 font-medium"
+                style={{ fontFamily: 'Cinzel, serif' }}
+              >
+                The World Is Yours To Play
+              </p>
+            </motion.div>
+          </div>
+
+          {/* Games Category Container */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="w-full flex flex-col gap-5"
+          >
             <p
-              className="text-lg tracking-[0.2em] uppercase text-got-parchment/70"
+              className="text-got-gold/70 text-xs tracking-[0.25em] uppercase text-center font-bold"
               style={{ fontFamily: 'Cinzel, serif' }}
             >
-              The World Is Yours To Play
+              Games
             </p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full">
+              <GameCard 
+                icon={FaMasksTheater} 
+                title="Imposter" 
+                description="Find the imposter before it's too late." 
+                to="/games/imposter" 
+              />
+              <GameCard 
+                icon={GiCrossedSwords} 
+                title="Draft" 
+                description="Build your house. Conquer Westeros." 
+                to="/games/draft" 
+              />
+              <GameCard 
+                icon={GiSpy} 
+                title="Who Am I?" 
+                description="Identify the character from the clues." 
+                comingSoon={true} 
+              />
+              <GameCard 
+                icon={GiScrollUnfurled} 
+                title="Trivia" 
+                description="Test your knowledge of Westeros." 
+                comingSoon={true} 
+              />
+            </div>
           </motion.div>
 
+          {/* Explore Category Container */}
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.35 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.45 }}
+            className="w-full flex flex-col gap-5 pb-4"
           >
-            <Link
-              to="/games/imposter"
-              className="inline-block py-4 px-10 rounded border border-got-gold bg-got-gold/10 text-got-gold text-lg tracking-widest uppercase transition-all duration-200 hover:bg-got-gold/20 active:scale-[0.97]"
+            <p
+              className="text-got-gold/70 text-xs tracking-[0.25em] uppercase text-center font-bold"
               style={{ fontFamily: 'Cinzel, serif' }}
             >
-              Play Now
-            </Link>
+              Explore Westeros
+            </p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full">
+              <GameCard 
+                icon={GiQuillInk} 
+                title="Characters" 
+                description="The people of Westeros." 
+                comingSoon={false} 
+                to="/characters" 
+              />
+              <GameCard 
+                icon={GiCastle} 
+                title="Houses" 
+                description="The great houses of the realm." 
+                comingSoon={true} 
+              />
+            </div>
           </motion.div>
+
         </div>
+      </PageWrapper>
 
-        {/* Games */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="w-full flex flex-col gap-4"
-        >
-          <p
-            className="text-got-gold/80 text-sm tracking-widest uppercase text-center"
-            style={{ fontFamily: 'Cinzel, serif' }}
-          >
-            Games
-          </p>
-          <div className="flex flex-col gap-4">
-            {GAMES.map((game) => (
-              <GameCard key={game.title} {...game} />
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Explore */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.65 }}
-          className="w-full flex flex-col gap-4 pb-4"
-        >
-          <p
-            className="text-got-gold/80 text-sm tracking-widest uppercase text-center"
-            style={{ fontFamily: 'Cinzel, serif' }}
-          >
-            Explore Westeros
-          </p>
-          <div className="grid grid-cols-2 gap-4">
-            {EXPLORE.map((item) => (
-              <GameCard key={item.title} {...item} />
-            ))}
-          </div>
-        </motion.div>
-      </div>
-    </PageWrapper>
+      {/* Subtle Immersive Footer */}
+      <footer className="w-full text-center py-6 text-[10px] tracking-widest uppercase text-got-stone border-t border-stone-900/40 bg-black/10 z-10">
+        <p style={{ fontFamily: 'Cinzel, serif' }}>
+          &copy; {new Date().getFullYear()} DKG Development
+        </p>
+      </footer>
+    </div>
   )
 }

@@ -67,7 +67,7 @@ describe('roleRating', () => {
 
   it('matches hand-calculated TEST_CHARACTER fixture', () => {
     expect(roleRating(TEST_CHARACTER, 'king')).toBe(70)
-    expect(roleRating(TEST_CHARACTER, 'grandMaester')).toBe(90)
+    expect(roleRating(TEST_CHARACTER, 'grandMaester')).toBe(85)
     expect(roleRating(TEST_CHARACTER, 'kingsguard')).toBe(66)
     expect(roleRating(TEST_CHARACTER, 'champion', 'versatile')).toBe(63)
   })

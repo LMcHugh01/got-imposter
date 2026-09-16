@@ -8,11 +8,10 @@ import {
   recoverTroopsAfterCasualties,
   FORMATIONS,
   applyFormationToBreakThreshold,
-  computeTerrainFormationMultiplier,
   resolvePersonalityProfile,
   ORDERS,
 } from '../../../gameEngine/battleEngine'
-import { computeDuelShare, DUEL_SHARE_THRESHOLD } from '../../../gameEngine/duelEngine'
+import { computeDuelShare } from '../../../gameEngine/duelEngine'
 import { SHOW_DEBUG_NUMBERS } from '../../../config/features'
 
 // v2 (pacing pass): renamed from the old flat TICK_INTERVAL_MS. The
@@ -30,7 +29,11 @@ const MAX_TICK_INTERVAL_MULTIPLIER = 1.5 // dead-even fights tick this much slow
 const RALLY_BOOST_TICKS = 3
 const RALLY_BOOST_DISCIPLINE = 99
 
-const STRATEGY_INFO = {
+// Exported — BattleTacticsPanel.jsx (rendered on the Campaign Dashboard,
+// not here) uses these same labels/blurbs for the opening Formation +
+// Strategy pickers, so there's exactly one copy of this presentation data
+// regardless of which screen is showing it.
+export const STRATEGY_INFO = {
   aggressive: { label: 'Push', blurb: 'More damage dealt and taken.' },
   balanced: { label: 'Balanced', blurb: 'No major modifier.' },
   defensive: { label: 'Hold the Line', blurb: 'Fewer casualties both sides, extra protection for Infantry.' },
@@ -44,7 +47,7 @@ const STRATEGY_INFO = {
 // Ambush isn't offered again once the fight is underway — it's a one-time
 // opening surprise, not something you switch into mid-battle. Regroup is
 // the mirror case — never offered as an opener, always available mid-fight.
-const OPENING_STRATEGIES = ['aggressive', 'balanced', 'defensive', 'ambush']
+export const OPENING_STRATEGIES = ['aggressive', 'balanced', 'defensive', 'ambush']
 const MID_BATTLE_STRATEGIES = ['aggressive', 'balanced', 'defensive', 'regroup']
 
 // Stage E: row order now follows the chosen Formation's lead type (§9) —
@@ -63,7 +66,7 @@ function rowOrderForFormation(formationId) {
   return [leadType, ...TROOP_ROW_ORDER.filter((type) => type !== leadType)]
 }
 
-const FORMATION_INFO = {
+export const FORMATION_INFO = {
   balanced: { blurb: 'No bonus or penalty — the honest default for a mixed army.' },
   shieldWall: { blurb: 'Infantry holds even when countered. Slower to break.' },
   cavalryVanguard: { blurb: 'A hard opening charge from Cavalry. Quicker to break.' },
@@ -72,13 +75,19 @@ const FORMATION_INFO = {
 
 // Formations, ordered for display — Balanced Line first as the neutral
 // default, then the three with an actual leadType.
-const FORMATION_ORDER = ['balanced', 'shieldWall', 'cavalryVanguard', 'skirmishLine']
+export const FORMATION_ORDER = ['balanced', 'shieldWall', 'cavalryVanguard', 'skirmishLine']
 
 function troopTotal(troops) {
   return troops.infantry + troops.archers + troops.cavalry
 }
 
 /**
+ * Battle Tactics (Formation + opening Strategy) are now chosen up front on
+ * the Campaign Dashboard, via BattleTacticsPanel — this component is the
+ * dedicated full-screen live fight ONLY, and always mounts already
+ * committed to a formation/opening strategy. `initialFormationId` /
+ * `initialStrategyId` carry that choice in for a fresh attempt.
+ *
  * `engagement`, when present (a retreat-and-reattempt — BATTLE_PLAN.md
  * §15), is `{ yourTroops, enemyTroops, enemyCumulativeCasualties,
  * formationId, ticksElapsed }`: the live counts as they stood when the
@@ -88,10 +97,8 @@ function troopTotal(troops) {
  * yourSide.troops/enemySide.troops, which reflect the CAMPAIGN's official
  * totals — untouched by an in-progress, unresolved retreat, since
  * retreating deliberately never calls recordBattleResult. When
- * `engagement` is provided, the opening Strategy/Formation screen is
- * skipped entirely (resuming a fight isn't a fresh opening move), the
- * fight resumes straight into the 'fighting' phase from those counts, and
- * the ORIGINAL formation choice + tick count carry forward unchanged — a
+ * `engagement` is provided, it wins over `initialFormationId` — the
+ * ORIGINAL formation choice + tick count carry forward unchanged, since a
  * formation's opening-tick bonus (Cavalry Vanguard, Skirmish Line) is
  * about the start of the whole engagement, not each individual attempt.
  *
@@ -109,17 +116,22 @@ export default function Battle({
   engagement = null,
   canRetreat = true,
   rallyAvailable = true,
+  initialFormationId = null,
+  initialStrategyId = null,
 }) {
   const attemptStartYourTroops = engagement?.yourTroops ?? yourSide.troops
   const attemptStartEnemyTroops = engagement?.enemyTroops ?? enemySide.troops
   const attemptStartYourArmy = troopTotal(attemptStartYourTroops)
   const attemptStartEnemyArmy = troopTotal(attemptStartEnemyTroops)
   const terrain = enemySide.terrain ?? 'plains'
+  // Fixed for the whole battle either way (never was switchable mid-fight,
+  // even back when this screen owned the opening Strategy/Formation step
+  // itself) — a plain const rather than state.
+  const formationId = engagement?.formationId ?? initialFormationId ?? 'balanced'
 
-  const [phase, setPhase] = useState(engagement ? 'fighting' : 'strategy') // strategy | fighting | breakDecision
-  const [strategyId, setStrategyId] = useState('balanced')
-  const [formationId, setFormationId] = useState(engagement?.formationId ?? 'balanced')
-  const [live, setLive] = useState(engagement ? { yourTroops: attemptStartYourTroops, enemyTroops: attemptStartEnemyTroops } : null)
+  const [phase, setPhase] = useState('fighting') // fighting | breakDecision
+  const [strategyId, setStrategyId] = useState(initialStrategyId ?? 'balanced')
+  const [live, setLive] = useState({ yourTroops: attemptStartYourTroops, enemyTroops: attemptStartEnemyTroops })
   const [confirmingSurrender, setConfirmingSurrender] = useState(false)
   const [rallyResolving, setRallyResolving] = useState(false)
   const strategyRef = useRef(strategyId)
@@ -183,13 +195,6 @@ export default function Battle({
   const dynamicTickInterval = Math.round(
     BASE_TICK_INTERVAL_MS * (MIN_TICK_INTERVAL_MULTIPLIER + closeness * (MAX_TICK_INTERVAL_MULTIPLIER - MIN_TICK_INTERVAL_MULTIPLIER))
   )
-
-  const handleOpenWith = (openingStrategy) => {
-    setStrategyId(openingStrategy)
-    strategyRef.current = openingStrategy
-    setLive({ yourTroops: attemptStartYourTroops, enemyTroops: attemptStartEnemyTroops })
-    setPhase('fighting')
-  }
 
   const resolve = (outcome, finalYourArmy, finalEnemyArmy) => {
     const finalResult = finalizeBattleResult({
@@ -306,124 +311,6 @@ export default function Battle({
         resolve('defeat', troopTotal(live.yourTroops), troopTotal(live.enemyTroops))
       }
     }, 900)
-  }
-
-  if (phase === 'strategy') {
-    // Debug-only — shows the ACTUAL computed power share and how it
-    // compares to the duel-offer threshold, so "why didn't I get offered
-    // a duel" is directly visible instead of something to infer.
-    const duelShare = SHOW_DEBUG_NUMBERS ? initialShare : null
-
-    return (
-      <div className="w-full max-w-sm flex flex-col gap-6 pt-4 pb-4">
-        <div className="text-center">
-          <p
-            className="text-got-parchment/40 text-sm tracking-[0.3em] uppercase"
-            style={{ fontFamily: 'Cinzel, serif' }}
-          >
-            Battle
-          </p>
-          <h1
-            className="text-2xl font-bold tracking-wide text-got-gold mt-1"
-            style={{ fontFamily: 'Cinzel, serif' }}
-          >
-            {enemySide.name}
-          </h1>
-          <p className="text-stone-500 text-xs mt-1 italic" style={{ fontFamily: 'EB Garamond, serif' }}>
-            {enemySide.flavorText}
-          </p>
-          <div className="gold-divider mt-3" />
-        </div>
-
-        <div className="rounded-lg border border-stone-700 bg-stone-900/60 p-4 flex justify-between items-center">
-          <div>
-            <p className="text-got-gold text-xs tracking-widest uppercase" style={{ fontFamily: 'Cinzel, serif' }}>
-              Your Army
-            </p>
-            <p className="text-got-parchment text-lg">{attemptStartYourArmy.toLocaleString()}</p>
-          </div>
-          <span className="text-stone-600 text-xl">⚔</span>
-          <div className="text-right">
-            <p className="text-got-red-bright text-xs tracking-widest uppercase" style={{ fontFamily: 'Cinzel, serif' }}>
-              {enemySide.name}
-            </p>
-            <p className="text-got-parchment text-lg">
-              {enemyArmyRange.low.toLocaleString()}–{enemyArmyRange.high.toLocaleString()}
-            </p>
-          </div>
-        </div>
-
-        {duelShare !== null && (
-          <p className="text-stone-600 text-xs text-center">
-            Power share: {Math.round(duelShare * 100)}% (duel offered at {Math.round(DUEL_SHARE_THRESHOLD * 100)}%+)
-          </p>
-        )}
-
-        <div className="flex flex-col gap-2">
-          <p
-            className="text-got-gold/80 text-xs tracking-widest uppercase"
-            style={{ fontFamily: 'Cinzel, serif' }}
-          >
-            Formation
-          </p>
-          {FORMATION_ORDER.filter((id) => {
-            const leadType = FORMATIONS[id].leadType
-            return !leadType || yourSide.troops[leadType] > 0
-          }).map((id) => {
-            const selected = id === formationId
-            const terrainMultiplier = computeTerrainFormationMultiplier(terrain, id)
-            const suitability = terrainMultiplier > 1 ? 'Favored here' : terrainMultiplier < 1 ? 'Poor fit for this terrain' : null
-            return (
-              <button
-                key={id}
-                onClick={() => setFormationId(id)}
-                className={[
-                  'text-left rounded-lg border p-3 transition-all duration-200',
-                  selected ? 'border-got-gold bg-got-gold/10' : 'border-stone-700 bg-stone-900/60 hover:border-got-gold/50',
-                ].join(' ')}
-              >
-                <div className="flex justify-between items-baseline gap-2">
-                  <p className="text-got-parchment" style={{ fontFamily: 'Cinzel, serif' }}>
-                    {FORMATIONS[id].label}
-                  </p>
-                  {suitability && (
-                    <span className={`text-xs flex-shrink-0 ${terrainMultiplier > 1 ? 'text-got-gold' : 'text-stone-600'}`}>
-                      {suitability}
-                    </span>
-                  )}
-                </div>
-                <p className="text-stone-500 text-xs mt-0.5 italic" style={{ fontFamily: 'EB Garamond, serif' }}>
-                  {FORMATION_INFO[id].blurb}
-                </p>
-              </button>
-            )
-          })}
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <p
-            className="text-got-gold/80 text-xs tracking-widest uppercase"
-            style={{ fontFamily: 'Cinzel, serif' }}
-          >
-            Opening Strategy
-          </p>
-          {OPENING_STRATEGIES.map((id) => (
-            <button
-              key={id}
-              onClick={() => handleOpenWith(id)}
-              className="text-left rounded-lg border border-stone-700 bg-stone-900/60 p-3 hover:border-got-gold/50 transition-all duration-200"
-            >
-              <p className="text-got-parchment" style={{ fontFamily: 'Cinzel, serif' }}>
-                {STRATEGY_INFO[id].label}
-              </p>
-              <p className="text-stone-500 text-xs mt-0.5 italic" style={{ fontFamily: 'EB Garamond, serif' }}>
-                {STRATEGY_INFO[id].blurb}
-              </p>
-            </button>
-          ))}
-        </div>
-      </div>
-    )
   }
 
   if (phase === 'breakDecision') {

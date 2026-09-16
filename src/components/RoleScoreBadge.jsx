@@ -4,11 +4,11 @@ import { fitLabel } from '../pages/games/draft/fitLabel'
 // stone/red palette. Color alone carries the "grade" — no % sign, no
 // inline text label — so this reads as a score card, not a percentage.
 const TIER_STYLES = {
-  Excellent: { text: 'text-got-gold', border: 'border-got-gold', bg: 'bg-got-gold/10' },
-  Strong: { text: 'text-got-parchment', border: 'border-got-parchment/50', bg: 'bg-got-parchment/5' },
-  Solid: { text: 'text-got-parchment/80', border: 'border-stone-500', bg: 'bg-stone-800/40' },
-  Weak: { text: 'text-stone-400', border: 'border-stone-700', bg: 'bg-stone-900/40' },
-  Poor: { text: 'text-got-red-bright/80', border: 'border-got-red/40', bg: 'bg-got-red/5' },
+  Excellent: { text: 'text-got-gold' },
+  Strong: { text: 'text-got-parchment' },
+  Solid: { text: 'text-got-parchment/80'},
+  Weak: { text: 'text-stone-400' },
+  Poor: { text: 'text-got-red-bright/80' },
 }
 
 /**
@@ -30,7 +30,7 @@ export default function RoleScoreBadge({ score, size = 'md' }) {
   return (
     <div
       className={[
-        'flex items-center justify-center rounded-lg border-2 font-black shrink-0',
+        'flex items-center justify-center font-black shrink-0',
         sizeClasses,
         style.text,
         style.border,

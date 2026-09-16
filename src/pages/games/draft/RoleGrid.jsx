@@ -8,13 +8,13 @@ const ROLE_CODES = {
   king: 'KING',
   consort: 'CONS',
   hand: 'HAND',
+  kingsguard: 'KG',
+  champion: 'CHMP',
   masterOfWhispers: 'WHISP',
   grandMaester: 'MAES',
   masterOfCoin: 'COIN',
   masterOfLaws: 'LAWS',
   commander: 'CMDR',
-  kingsguard: 'KG',
-  champion: 'CHMP',
 }
 
 export default function RoleGrid({ draftState, selectedCharacter, onAssign }) {
