@@ -10,26 +10,30 @@ import {
   getFinalRoster,
 } from './draftEngine'
 import { ROLES } from '../data/roleWeights'
+import { ALL_ATTRIBUTE_KEYS } from '../data/attributes'
+import { CHAMPION_STYLES } from '../data/championStyles'
 
 // Deterministic "random" for reproducible tests — not realistic shuffling,
 // just a fixed, valid permutation every time.
 const fixedRng = () => 0
 
+// Built from ALL_ATTRIBUTE_KEYS rather than a hand-copied list — a stale
+// 8-key schema here (combat/leadership/politics/loyalty/...) was the
+// actual cause of the NaN fit values below: any weighted attribute
+// missing from the object reads as undefined, and undefined * weight =
+// NaN poisons roleRating's whole sum. Every mock character also needs a
+// fightingStyle now — assignRole is deliberately strict about Champion
+// needing one (a real data gap should surface immediately, per its own
+// comment), and a real, fully-tagged roster always has one — a mock pool
+// without one was silently relying on the draft loop never landing a
+// character on Champion, which broke the moment it did.
 function mockPool(size) {
   return Array.from({ length: size }, (_, i) => ({
     id: `char-${i}`,
     name: `Character ${i}`,
     house: i % 2 === 0 ? 'House Test' : null,
-    attributes: {
-      combat: (i * 7) % 100,
-      leadership: (i * 11) % 100,
-      strategy: (i * 13) % 100,
-      intelligence: (i * 17) % 100,
-      politics: (i * 19) % 100,
-      diplomacy: (i * 23) % 100,
-      loyalty: (i * 29) % 100,
-      economy: (i * 31) % 100,
-    },
+    attributes: Object.fromEntries(ALL_ATTRIBUTE_KEYS.map((key, j) => [key, (i * (7 + j * 4)) % 100])),
+    fightingStyle: CHAMPION_STYLES[i % CHAMPION_STYLES.length],
   }))
 }
 

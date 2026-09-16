@@ -1,27 +1,27 @@
 import { describe, it, expect } from 'vitest'
-import { gatherIntelligence } from './intelligence'
+import { gatherIntelligence, PERSONALITIES } from './intelligence'
 
-const enemyHouse = { armySize: 40000, morale: 70, personality: 'aggressive' }
+// morale deliberately mid-range (not close to the 0/100 ceiling) — a
+// value near a boundary combined with a wide low-accuracy split can get
+// clamped, silently shrinking the reported width and making width-based
+// assertions flaky depending on the random draw. See the fixed rng below
+// for the same reason, applied to the specific test that checks width.
+const enemyHouse = { armySize: 40000, morale: 50, personality: 'aggressive' }
 
 describe('gatherIntelligence', () => {
-  it('gives a wide army range and hides morale/personality at low accuracy', () => {
-    const report = gatherIntelligence({ masterOfWhispersRating: 5, enemyHouse })
+  it('gives a wide army range and a wide morale range at low accuracy', () => {
+    const report = gatherIntelligence({ masterOfWhispersRating: 5, enemyHouse, rng: () => 0.5 })
     expect(report.armyRangeHigh - report.armyRangeLow).toBeGreaterThan(30000)
-    expect(report.moraleRevealed).toBe(false)
-    expect(report.morale).toBeNull()
-    expect(report.personalityRevealed).toBe(false)
+    expect(report.moraleRangeHigh - report.moraleRangeLow).toBeGreaterThan(50)
   })
 
-  it('gives a meaningfully tighter range and reveals morale/personality at high accuracy', () => {
+  it('gives meaningfully tighter army and morale ranges at high accuracy', () => {
     const report = gatherIntelligence({ masterOfWhispersRating: 95, enemyHouse })
     expect(report.armyRangeHigh - report.armyRangeLow).toBeLessThan(10000)
-    expect(report.moraleRevealed).toBe(true)
-    expect(report.morale).toBe(70)
-    expect(report.personalityRevealed).toBe(true)
-    expect(report.personality).toBe('aggressive')
+    expect(report.moraleRangeHigh - report.moraleRangeLow).toBeLessThan(15)
   })
 
-  it('never collapses to a single number, even at maximum accuracy', () => {
+  it('never collapses the army range to a single number, even at maximum accuracy', () => {
     const report = gatherIntelligence({ masterOfWhispersRating: 100, enemyHouse })
     expect(report.armyRangeHigh).toBeGreaterThan(report.armyRangeLow)
     expect(report.armyRangeHigh - report.armyRangeLow).toBeGreaterThan(1000)
@@ -35,7 +35,17 @@ describe('gatherIntelligence', () => {
     }
   })
 
-  it('is not centered on the true value — the split is random, not symmetric', () => {
+  it('the true morale always falls within the reported range, clamped to 0-100', () => {
+    for (const rating of [0, 10, 40, 70, 100]) {
+      const report = gatherIntelligence({ masterOfWhispersRating: rating, enemyHouse })
+      expect(enemyHouse.morale).toBeGreaterThanOrEqual(report.moraleRangeLow)
+      expect(enemyHouse.morale).toBeLessThanOrEqual(report.moraleRangeHigh)
+      expect(report.moraleRangeLow).toBeGreaterThanOrEqual(0)
+      expect(report.moraleRangeHigh).toBeLessThanOrEqual(100)
+    }
+  })
+
+  it('is not centered on the true army size — the split is random, not symmetric', () => {
     // rng() = 0.2 -> only 20% of the total width goes below the true value,
     // 80% goes above -> the true value sits near the LOW end of the range.
     const skewedLow = gatherIntelligence({ masterOfWhispersRating: 50, enemyHouse, rng: () => 0.2 })
@@ -48,5 +58,31 @@ describe('gatherIntelligence', () => {
     const belowSpan2 = enemyHouse.armySize - skewedHigh.armyRangeLow
     const aboveSpan2 = skewedHigh.armyRangeHigh - enemyHouse.armySize
     expect(belowSpan2).toBeGreaterThan(aboveSpan2)
+  })
+
+  // --- personality shortlist (new) ------------------------------------
+
+  it('shows every personality (no signal at all) at zero accuracy', () => {
+    const report = gatherIntelligence({ masterOfWhispersRating: 0, enemyHouse })
+    expect(report.personalityShortlist).toHaveLength(PERSONALITIES.length)
+    expect(report.personalityShortlist).toContain(enemyHouse.personality)
+  })
+
+  it('narrows to exactly the true personality at maximum accuracy', () => {
+    const report = gatherIntelligence({ masterOfWhispersRating: 100, enemyHouse })
+    expect(report.personalityShortlist).toEqual([enemyHouse.personality])
+  })
+
+  it('the true personality is always somewhere in the shortlist, at any accuracy', () => {
+    for (const rating of [0, 10, 40, 70, 100]) {
+      const report = gatherIntelligence({ masterOfWhispersRating: rating, enemyHouse })
+      expect(report.personalityShortlist).toContain(enemyHouse.personality)
+    }
+  })
+
+  it('the shortlist shrinks as accuracy increases', () => {
+    const low = gatherIntelligence({ masterOfWhispersRating: 10, enemyHouse })
+    const high = gatherIntelligence({ masterOfWhispersRating: 80, enemyHouse })
+    expect(high.personalityShortlist.length).toBeLessThan(low.personalityShortlist.length)
   })
 })

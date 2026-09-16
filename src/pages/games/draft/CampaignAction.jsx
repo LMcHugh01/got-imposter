@@ -7,6 +7,7 @@ import { SHOW_DEBUG_NUMBERS } from '../../../config/features'
 
 const RECRUIT_PRESETS = [2000, 5000, 10000]
 const RECOVER_PRESETS = [2000, 3000, 5000]
+const TROOP_TYPE_LABELS = { infantry: 'Infantry', archers: 'Archers', cavalry: 'Cavalry' }
 const SOLDIER_STEP = 500
 const GOLD_STEP = 500
 const MIN_SOLDIERS_REQUESTED = 500
@@ -23,8 +24,9 @@ export default function CampaignAction({ resources, enemyHouse, economyInputs, o
   const [resultMessage, setResultMessage] = useState(null)
   const [pendingResources, setPendingResources] = useState(null)
   const [intelReport, setIntelReport] = useState(null)
+  const [recruitTroopType, setRecruitTroopType] = useState('infantry')
 
-  const { masterOfCoinRating, diplomacyRating, masterOfWhispersRating } = economyInputs
+  const { masterOfCoinRating, diplomacyRating, masterOfWhispersRating, grandMaesterRating, masterOfLawsRating } = economyInputs
 
   const handleSkip = () => onComplete({ resources, scouted: false, intelReport: null })
 
@@ -37,13 +39,18 @@ export default function CampaignAction({ resources, enemyHouse, economyInputs, o
   }
 
   const handleRecruit = (amount) => {
-    const { resources: next, soldiersGained } = recruit({ resources, goldToSpend: amount, masterOfCoinRating })
+    const { resources: next, soldiersGained } = recruit({ resources, goldToSpend: amount, masterOfCoinRating, troopType: recruitTroopType })
     setPendingResources(next)
-    setResultMessage(`+${soldiersGained.toLocaleString()} soldiers recruited.`)
+    setResultMessage(`+${soldiersGained.toLocaleString()} ${TROOP_TYPE_LABELS[recruitTroopType]} recruited.`)
   }
 
   const handleRecover = (amount) => {
-    const { resources: next, soldiersReturned, moraleGained } = recover({ resources, goldToSpend: amount })
+    const { resources: next, soldiersReturned, moraleGained } = recover({
+      resources,
+      goldToSpend: amount,
+      grandMaesterRating,
+      masterOfLawsRating,
+    })
     setPendingResources(next)
     setResultMessage(`+${soldiersReturned.toLocaleString()} soldiers returned, +${moraleGained} morale.`)
   }
@@ -130,6 +137,7 @@ export default function CampaignAction({ resources, enemyHouse, economyInputs, o
         presets={RECRUIT_PRESETS}
         onSpend={handleRecruit}
         onBack={() => setView('menu')}
+        extra={<TroopTypeSelector value={recruitTroopType} onChange={setRecruitTroopType} />}
       />
     )
   }
@@ -235,12 +243,14 @@ export default function CampaignAction({ resources, enemyHouse, economyInputs, o
           </div>
           <div className="flex justify-between">
             <span className="text-stone-500 text-sm">Morale</span>
-            <span className="text-got-parchment">{intelReport.moraleRevealed ? intelReport.morale : 'Unknown'}</span>
+            <span className="text-got-parchment">
+              {intelReport.moraleRangeLow}–{intelReport.moraleRangeHigh}
+            </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-stone-500 text-sm">Personality</span>
-            <span className="text-got-parchment capitalize">
-              {intelReport.personalityRevealed ? intelReport.personality : 'Unknown'}
+          <div className="flex justify-between items-start">
+            <span className="text-stone-500 text-sm">Could be</span>
+            <span className="text-got-parchment capitalize text-right">
+              {intelReport.personalityShortlist.join(' / ')}
             </span>
           </div>
         </div>
@@ -292,7 +302,7 @@ function ActionButton({ title, blurb, onClick }) {
   )
 }
 
-function ActionSpendScreen({ title, gold, presets, onSpend, onBack }) {
+function ActionSpendScreen({ title, gold, presets, onSpend, onBack, extra = null }) {
   return (
     <div className="w-full max-w-sm flex flex-col gap-4 pt-4 pb-4">
       <div className="text-center">
@@ -302,6 +312,7 @@ function ActionSpendScreen({ title, gold, presets, onSpend, onBack }) {
         <p className="text-stone-500 text-xs mt-1">{gold.toLocaleString()} gold available</p>
         <div className="gold-divider mt-3" />
       </div>
+      {extra}
       <div className="flex flex-col gap-2">
         {presets.map((amount) => (
           <button
@@ -322,6 +333,41 @@ function ActionSpendScreen({ title, gold, presets, onSpend, onBack }) {
       >
         ← Back
       </button>
+    </div>
+  )
+}
+
+// Recruit-only (BATTLE_PLAN.md §5) — the one pre-battle action where the
+// player actively picks composition. Not passed to Recover's
+// ActionSpendScreen, which stays untouched — Recover reinforces whatever
+// mix you already have, proportionally, via resources.js's generic
+// army-delta split.
+function TroopTypeSelector({ value, onChange }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-got-gold/80 text-xs tracking-widest uppercase" style={{ fontFamily: 'Cinzel, serif' }}>
+        Troop Type
+      </p>
+      <div className="grid grid-cols-3 gap-2">
+        {Object.keys(TROOP_TYPE_LABELS).map((type) => {
+          const selected = type === value
+          return (
+            <button
+              key={type}
+              onClick={() => onChange(type)}
+              className={[
+                'rounded-lg border py-2 text-sm transition-all duration-200',
+                selected
+                  ? 'border-got-gold bg-got-gold/10 text-got-gold'
+                  : 'border-stone-700 bg-stone-900/60 text-got-parchment hover:border-got-gold/50',
+              ].join(' ')}
+              style={{ fontFamily: 'Cinzel, serif' }}
+            >
+              {TROOP_TYPE_LABELS[type]}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

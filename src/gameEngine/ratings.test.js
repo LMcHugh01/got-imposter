@@ -35,36 +35,41 @@ const TEST_CHARACTER = {
 
 describe('roleRating', () => {
   it('rates a flat-50 character exactly 50 in every role', () => {
-    const ratings = allRoleRatings(FLAT_50)
+    // A fighting style must be passed for Champion to be computed at all —
+    // allRoleRatings deliberately returns null for Champion without one
+    // (a "not yet knowable" case for the Characters browse page), which
+    // isn't what this test is checking. Any style works here since every
+    // one of them sums to 1.0 the same as every other role's weights.
+    const ratings = allRoleRatings(FLAT_50, 'versatile')
     Object.values(ratings).forEach((rating) => expect(rating).toBe(50))
   })
 
   it('clamps ratings to 1-99, never 0 or 100', () => {
-    const zeroRatings = allRoleRatings(ALL_ZERO)
+    const zeroRatings = allRoleRatings(ALL_ZERO, 'versatile')
     Object.values(zeroRatings).forEach((rating) => expect(rating).toBe(1))
 
-    const maxRatings = allRoleRatings(ALL_MAX)
+    const maxRatings = allRoleRatings(ALL_MAX, 'versatile')
     Object.values(maxRatings).forEach((rating) => expect(rating).toBe(99))
   })
 
   it('weights a single attribute correctly per role', () => {
     const techniqueOnly = attributeOnly('technique')
-    expect(roleRating(techniqueOnly, 'kingsguard')).toBe(25) // technique 25%
-    expect(roleRating(techniqueOnly, 'champion')).toBe(30) // technique 30%
+    expect(roleRating(techniqueOnly, 'kingsguard')).toBe(35) // technique 35%
+    expect(roleRating(techniqueOnly, 'champion', 'basic')).toBe(30) // basic style: technique 30%
     expect(roleRating(techniqueOnly, 'commander')).toBe(10) // technique 10%
     expect(roleRating(techniqueOnly, 'king')).toBe(1) // technique has no weight here -> clamps up from 0
 
     const commandOnly = attributeOnly('command')
     expect(roleRating(commandOnly, 'king')).toBe(20) // command 20%
-    expect(roleRating(commandOnly, 'commander')).toBe(20) // command 20%
+    expect(roleRating(commandOnly, 'commander')).toBe(25) // command 25%
     expect(roleRating(commandOnly, 'kingsguard')).toBe(1) // command has no weight here -> clamps up from 0
   })
 
   it('matches hand-calculated TEST_CHARACTER fixture', () => {
     expect(roleRating(TEST_CHARACTER, 'king')).toBe(70)
-    expect(roleRating(TEST_CHARACTER, 'grandMaester')).toBe(77)
-    expect(roleRating(TEST_CHARACTER, 'kingsguard')).toBe(67)
-    expect(roleRating(TEST_CHARACTER, 'champion')).toBe(57)
+    expect(roleRating(TEST_CHARACTER, 'grandMaester')).toBe(90)
+    expect(roleRating(TEST_CHARACTER, 'kingsguard')).toBe(66)
+    expect(roleRating(TEST_CHARACTER, 'champion', 'versatile')).toBe(63)
   })
 
   it('throws on an unknown role id', () => {

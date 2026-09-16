@@ -1,12 +1,20 @@
 import { describe, it, expect } from 'vitest'
 import { computeHouseStats, overallHouseRating, houseStrengthsWeaknesses, STAT_LABELS } from './houseStats'
 import { ROLES } from '../data/roleWeights'
+import { ALL_ATTRIBUTE_KEYS } from '../data/attributes'
 
+// Built from ALL_ATTRIBUTE_KEYS rather than a hand-copied list — this was
+// the actual bug behind every NaN failure here: a stale 8-key schema
+// (combat/leadership/politics/loyalty/...) that predates the current
+// 23-attribute system. Any weighted attribute missing from the object
+// reads as undefined, and undefined * weight = NaN poisons the whole
+// weighted sum. Since every role's weights sum to 1.0 (net of any
+// penalties), a uniform flat value across ALL 23 attributes still rates
+// as exactly that value for every role — the test's own hardcoded
+// expected numbers (36, 72, 26, 37, 59...) were already correct; they
+// just never had a working fixture to actually produce them.
 function flatAttributes(value) {
-  return {
-    combat: value, leadership: value, strategy: value, intelligence: value,
-    politics: value, diplomacy: value, loyalty: value, economy: value,
-  }
+  return Object.fromEntries(ALL_ATTRIBUTE_KEYS.map((key) => [key, value]))
 }
 
 function mockRoster(valueByRole, fallback = 50) {
@@ -17,6 +25,12 @@ function mockRoster(valueByRole, fallback = 50) {
       name: `${role.label} Pick`,
       house: null,
       attributes: flatAttributes(valueByRole[role.id] ?? fallback),
+      // Champion's contribution to `military` needs a style or it's
+      // silently excluded (houseStats.js's own graceful-degradation guard)
+      // — any style works here since every one sums to 1.0 the same as
+      // every other role, so a flat-value character rates the same value
+      // regardless of which style is picked.
+      fightingStyle: 'versatile',
     },
   }))
 }
@@ -40,8 +54,10 @@ describe('computeHouseStats', () => {
     expect(stats.diplomacy).toBe(72)
     expect(stats.intelligence).toBe(72)
     expect(stats.stability).toBe(72)
-    // Military pulls from the two weak roles + one strong one -> drags down
-    expect(stats.military).toBe(26)
+    // Military = avg(commander/strategy 2.25, commander/battleMorale 2.25,
+    // kingsguard/strength 2.25, champion/technique 72.25) = 19.75 -> 20.
+    // Three weak contributions + one strong (Champion) drags it down hard.
+    expect(stats.military).toBe(20)
     // Morale pulls from King (strong) + Kingsguard (weak) -> drags down
     expect(stats.morale).toBe(37)
   })
@@ -56,8 +72,8 @@ describe('overallHouseRating', () => {
   it('averages the 6 stats', () => {
     const roster = mockRoster({ kingsguard: 15, commander: 15 }, 85)
     const stats = computeHouseStats(roster)
-    // (26 + 72 + 72 + 72 + 72 + 37) / 6 = 58.5 -> rounds to 59
-    expect(overallHouseRating(stats)).toBe(59)
+    // (20 + 72 + 72 + 72 + 72 + 37) / 6 = 57.5 -> rounds to 58
+    expect(overallHouseRating(stats)).toBe(58)
   })
 
   it('matches the flat-council value when every stat is identical', () => {

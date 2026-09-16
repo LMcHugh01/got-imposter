@@ -1,3 +1,4 @@
+.
 ├── folder_structure.txt
 ├── index.html
 ├── netlify.toml
@@ -6,7 +7,12 @@
 ├── public
 │   ├── _redirects
 │   ├── characters
-│   │   └── jon-snow.jpg
+│   │   ├── brienne-of-tarth.jpg
+│   │   ├── cersei-lannister.jpg
+│   │   ├── jamie-lannister.jpg
+│   │   ├── jon-snow.jpg
+│   │   ├── tyrion-lannister.jpg
+│   │   └── tywin-lannister.jpg
 │   └── vite.svg
 ├── scripts
 │   ├── character-shortlist.csv
@@ -62,7 +68,6 @@
 │   │   └── supabase.js
 │   ├── main.jsx
 │   ├── pages
-│   │   ├── Draft.jsx
 │   │   ├── Games.jsx
 │   │   ├── Home.jsx
 │   │   ├── ImposterHome.jsx
@@ -98,4 +103,4 @@
 │       └── gameStore.js
 └── vite.config.js
 
-20 directories, 80 files
+20 directories, 85 files

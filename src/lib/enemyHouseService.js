@@ -1,14 +1,40 @@
 import { supabase } from './supabase'
 import { SELECT_COLUMNS, mapAttributeRow, mapFightingStyle } from './characterAttributesService'
 
+// Same first-draft default ratio as resources.js's starting composition —
+// used as a fallback for any enemy_houses row that predates migration 008
+// (infantry_count/archers_count/cavalry_count), so a house without those
+// columns populated yet doesn't crash the battle, just gets a generic mix.
+const FALLBACK_TROOP_SHARE = { infantry: 0.6, archers: 0.2, cavalry: 0.2 }
+
+function normalizeTroops(row) {
+  const { infantry_count: infantry, archers_count: archers, cavalry_count: cavalry } = row
+  if (infantry != null && archers != null && cavalry != null) {
+    return { infantry, archers, cavalry }
+  }
+  const total = row.army_size
+  const fallbackInfantry = Math.round(total * FALLBACK_TROOP_SHARE.infantry)
+  const fallbackArchers = Math.round(total * FALLBACK_TROOP_SHARE.archers)
+  return { infantry: fallbackInfantry, archers: fallbackArchers, cavalry: total - fallbackInfantry - fallbackArchers }
+}
+
+// Fallback for any enemy_houses row that predates migration 009 (terrain)
+// — Plains is a fully neutral default (computeTerrainFormationMultiplier
+// returns 1 for every formation except Cavalry Vanguard, which it merely
+// favors rather than requiring), so an un-migrated house just doesn't get
+// any terrain flavor rather than breaking anything.
+const FALLBACK_TERRAIN = 'plains'
+
 function normalizeEnemyHouse(row) {
   return {
     id: row.id,
     name: row.name,
     tier: row.tier,
     personality: row.personality,
+    terrain: row.terrain ?? FALLBACK_TERRAIN,
     rating: row.rating,
     armySize: row.army_size,
+    troops: normalizeTroops(row),
     armyQuality: row.army_quality,
     morale: row.morale,
     supply: row.supply,
