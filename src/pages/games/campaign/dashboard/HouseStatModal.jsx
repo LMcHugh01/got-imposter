@@ -1,7 +1,7 @@
-import { roleRating } from '../../../gameEngine/ratings'
-import { STAT_CONTRIBUTORS, STAT_LABELS, ratingLabel } from '../../../gameEngine/houseStats'
-import { ATTRIBUTE_LABELS } from '../../../data/attributes'
-import { CHAMPION_STYLE_LABELS } from '../../../data/championStyles'
+import { roleRating } from '../../../../gameEngine/ratings'
+import { STAT_CONTRIBUTORS, STAT_LABELS, ratingLabel } from '../../../../gameEngine/houseStats'
+import { ATTRIBUTE_LABELS } from '../../../../data/attributes'
+import { CHAMPION_STYLE_LABELS } from '../../../../data/championStyles'
 
 /**
  * pages/games/draft/HouseStatModal.jsx

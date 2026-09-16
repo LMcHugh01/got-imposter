@@ -1,6 +1,6 @@
 import PageWrapper from '../components/PageWrapper'
 import GameCard from '../components/GameCard'
-import { GiCrossedSwords, GiExecutionerHood, GiScrollQuill } from 'react-icons/gi'
+import { GiCrossedSwords, GiScrollQuill, GiExecutionerHood, GiQuillInk } from 'react-icons/gi'
 import { FaMasksTheater } from "react-icons/fa6";
 
 const GAMES = [
@@ -12,8 +12,14 @@ const GAMES = [
   },
   { 
     icon: GiCrossedSwords, 
-    title: 'Draft', 
+    title: 'Campaign', 
     description: 'Build your house. Conquer Westeros.', 
+    to: '/games/campaign' 
+  },
+  { 
+    icon: GiQuillInk, 
+    title: 'Draft', 
+    description: 'Draft the highest-rated council you can.', 
     to: '/games/draft' 
   },
   { 

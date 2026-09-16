@@ -1,12 +1,15 @@
 import { Link } from 'react-router-dom'
 
-export default function CampaignVictory({ summary }) {
+export default function CampaignVictory({ houseName, summary }) {
   return (
     <div className="w-full max-w-sm flex flex-col gap-6 pt-4 pb-4 text-center">
       <div>
         <div className="text-6xl mb-2 select-none">👑</div>
+        <p className="text-got-gold/60 text-xs tracking-[0.3em] uppercase" style={{ fontFamily: 'Cinzel, serif' }}>
+          House {houseName}
+        </p>
         <h1
-          className="text-3xl font-black tracking-wider uppercase text-got-gold"
+          className="text-3xl font-black tracking-wider uppercase text-got-gold mt-1"
           style={{ fontFamily: 'Cinzel, serif', textShadow: '0 0 30px rgba(201,168,76,0.4)' }}
         >
           Iron Throne Claimed

@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
-import { ratingLabel } from '../../../gameEngine/houseStats'
+import { ratingLabel } from '../../../../gameEngine/houseStats'
 
 export default function BattleResult({
+  houseName,
   result,
   enemyHouse,
   battleNumber,
@@ -32,7 +33,9 @@ export default function BattleResult({
         >
           {viaDuel ? (won ? 'Single Combat Won' : 'Single Combat Lost') : won ? 'Victory' : 'Defeat'}
         </h1>
-        <p className="text-stone-500 text-sm mt-1">vs {enemyHouse.name}</p>
+        <p className="text-stone-500 text-sm mt-1">
+          House {houseName} vs {enemyHouse.name}
+        </p>
         <div className="gold-divider mt-3" />
       </div>
 

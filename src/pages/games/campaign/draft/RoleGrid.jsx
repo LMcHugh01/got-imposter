@@ -1,5 +1,5 @@
-import { ROLES } from '../../../data/roleWeights'
-import RoleScoreBadge from '../../../components/RoleScoreBadge'
+import { ROLES } from '../../../../data/roleWeights'
+import RoleScoreBadge from '../../../../components/RoleScoreBadge'
 
 // Purely decorative short codes for the council row badges — cosmetic
 // only, mirrors the existing ATTRIBUTE_SHORT_LABELS pattern. Not used by

@@ -6,6 +6,7 @@ import {
   GiCrossedSwords, 
   GiSpy,
   GiScrollUnfurled, 
+  GiScrollQuill,
   GiQuillInk, 
   GiCastle 
 } from 'react-icons/gi'
@@ -73,8 +74,14 @@ export default function Home() {
               />
               <GameCard 
                 icon={GiCrossedSwords} 
-                title="Draft" 
+                title="Campaign" 
                 description="Build your house. Conquer Westeros." 
+                to="/games/campaign" 
+              />
+              <GameCard 
+                icon={GiScrollQuill} 
+                title="Draft" 
+                description="Draft the highest-rated council you can." 
                 to="/games/draft" 
               />
               <GameCard 

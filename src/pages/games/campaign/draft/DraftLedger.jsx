@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { ROLE_WEIGHTS } from '../../../data/roleWeights'
-import { CHAMPION_STYLE_WEIGHTS, CHAMPION_STYLE_LABELS } from '../../../data/championStyles'
-import { ATTRIBUTE_LABELS, ALL_ATTRIBUTE_KEYS } from '../../../data/attributes'
+import { ROLE_WEIGHTS } from '../../../../data/roleWeights'
+import { CHAMPION_STYLE_WEIGHTS, CHAMPION_STYLE_LABELS } from '../../../../data/championStyles'
+import { ATTRIBUTE_LABELS, ALL_ATTRIBUTE_KEYS } from '../../../../data/attributes'
 import { fitLabel } from './fitLabel'
 
 /**

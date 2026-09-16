@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { fetchEnemyHouseChampions } from '../../../lib/enemyHouseService'
-import { getDuelFighter, getEnemyDuelFighter, resolveDuel, finalizeDuelResult } from '../../../gameEngine/duelEngine'
-import { CHAMPION_STYLE_LABELS } from '../../../data/championStyles'
+import { fetchEnemyHouseChampions } from '../../../../lib/enemyHouseService'
+import { getDuelFighter, getEnemyDuelFighter, resolveDuel, finalizeDuelResult } from '../../../../gameEngine/duelEngine'
+import { CHAMPION_STYLE_LABELS } from '../../../../data/championStyles'
 
 /**
  * Sits between Campaign Action and Battle, only reachable when

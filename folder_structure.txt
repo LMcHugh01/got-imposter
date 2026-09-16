@@ -78,16 +78,54 @@
 │   │   ├── characters
 │   │   │   └── Characters.jsx
 │   │   ├── games
+│   │   │   ├── campaign
+│   │   │   │   ├── CampaignVictory.jsx
+│   │   │   │   ├── Draft.jsx
+│   │   │   │   ├── battle
+│   │   │   │   │   ├── Battle.jsx
+│   │   │   │   │   ├── BattleResult.jsx
+│   │   │   │   │   ├── DuelOffer.jsx
+│   │   │   │   │   └── battleSides.js
+│   │   │   │   ├── campaign
+│   │   │   │   │   ├── CampaignAction.jsx
+│   │   │   │   │   ├── CampaignDashboard.jsx
+│   │   │   │   │   ├── CouncilOverview.jsx
+│   │   │   │   │   ├── EnemyScoutReport.jsx
+│   │   │   │   │   ├── HouseStatModal.jsx
+│   │   │   │   │   ├── PreBattleActionModal.jsx
+│   │   │   │   │   ├── PrepareForBattleModal.jsx
+│   │   │   │   │   ├── ResourcesBar.jsx
+│   │   │   │   │   └── SectionHeading.jsx
+│   │   │   │   └── draft
+│   │   │   │       ├── DraftBoard.jsx
+│   │   │   │       ├── DraftIntro.jsx
+│   │   │   │       ├── DraftLedger.jsx
+│   │   │   │       ├── DraftOathModal.jsx
+│   │   │   │       ├── RoleGrid.jsx
+│   │   │   │       ├── Roster.jsx
+│   │   │   │       └── fitLabel.js
 │   │   │   ├── draft
 │   │   │   │   ├── Battle.jsx
 │   │   │   │   ├── BattleResult.jsx
 │   │   │   │   ├── CampaignAction.jsx
+│   │   │   │   ├── CampaignDashboard.jsx
 │   │   │   │   ├── CampaignVictory.jsx
+│   │   │   │   ├── CouncilOverview.jsx
 │   │   │   │   ├── Draft.jsx
 │   │   │   │   ├── DraftBoard.jsx
+│   │   │   │   ├── DraftIntro.jsx
+│   │   │   │   ├── DraftLedger.jsx
+│   │   │   │   ├── DraftOathModal.jsx
 │   │   │   │   ├── DuelOffer.jsx
+│   │   │   │   ├── EnemyScoutReport.jsx
+│   │   │   │   ├── HouseStatModal.jsx
+│   │   │   │   ├── PreBattleActionModal.jsx
+│   │   │   │   ├── PrepareForBattleModal.jsx
+│   │   │   │   ├── ResourcesBar.jsx
 │   │   │   │   ├── RoleGrid.jsx
 │   │   │   │   ├── Roster.jsx
+│   │   │   │   ├── SectionHeading.jsx
+│   │   │   │   ├── battleSides.js
 │   │   │   │   └── fitLabel.js
 │   │   │   ├── imposter
 │   │   │   │   ├── CardReveal.jsx
@@ -103,4 +141,4 @@
 │       └── gameStore.js
 └── vite.config.js
 
-20 directories, 85 files
+24 directories, 118 files

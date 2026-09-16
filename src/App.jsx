@@ -16,6 +16,7 @@ import EliminationReveal from './pages/games/imposter/EliminationReveal'
 import Results from './pages/games/imposter/Results'
 
 import Draft from './pages/games/draft/Draft'
+import Campaign from './pages/games/campaign/Draft'
 import WhoAmI from './pages/WhoAmI'
 import Trivia from './pages/Trivia'
 
@@ -40,6 +41,7 @@ function AppRoutes() {
           <Route path="/games/imposter/results" element={<Results />} />
 
           <Route path="/games/draft" element={<Draft />} />
+          <Route path="/games/campaign" element={<Campaign />} />
           <Route path="/games/who-am-i" element={<WhoAmI />} />
           <Route path="/games/trivia" element={<Trivia />} />
         </Routes>

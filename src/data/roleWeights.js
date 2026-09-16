@@ -91,24 +91,21 @@ export const ROLE_WEIGHTS = {
     intimidation: 0.1,
   },
   masterOfWhispers: {
-    subterfuge: 0.4,
+    subterfuge: 0.3,
     cunning: 0.3,
-    selfPreservation: 0.2,
-    stealth: 0.1,
-    scholarship: 0.1,
-    diplomacy: 0.1,
-    intimidation: 0.1,
-    honour: -0.3,
+    selfPreservation: 0.15,
+    stealth: 0.05,
+    scholarship: 0.05,
+    diplomacy: 0.3,
+    etiquette: 0.05,
+    honour: -0.2,
   },
   grandMaester: {
-    scholarship: 0.7,
-    duty: 0.2,
-    justice: 0.1,
-    etiquette: 0.1,
+    scholarship: 0.8,
+    duty: 0.1,
     diplomacy: 0.1,
     willpower: 0.1,
     technique: -0.1, 
-    family: -0.2,
   },
   masterOfCoin: {
     economy: 0.4,
@@ -138,8 +135,6 @@ export const ROLE_WEIGHTS = {
     recruitment: 0.05,
     selfPreservation: -0.1,
   },
-  // Redesigned independently of the "add a penalty" pass above — no
-  // negative weight here, just a different positive-weight composition.
   kingsguard: {
     duty: 0.1,
     technique: 0.35,
@@ -149,5 +144,4 @@ export const ROLE_WEIGHTS = {
     intimidation: 0.05,
     honour: 0.05,
   },
-  // champion intentionally omitted — see data/championStyles.js
 }

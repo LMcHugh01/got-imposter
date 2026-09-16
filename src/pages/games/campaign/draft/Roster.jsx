@@ -4,8 +4,8 @@ import {
   houseStrengthsWeaknesses,
   ratingLabel,
   STAT_LABELS,
-} from '../../../gameEngine/houseStats'
-import RoleScoreBadge from '../../../components/RoleScoreBadge'
+} from '../../../../gameEngine/houseStats'
+import RoleScoreBadge from '../../../../components/RoleScoreBadge'
 
 export default function Roster({ roster, houseName }) {
   const stats = computeHouseStats(roster)

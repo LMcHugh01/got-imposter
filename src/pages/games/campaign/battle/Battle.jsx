@@ -10,9 +10,9 @@ import {
   applyFormationToBreakThreshold,
   resolvePersonalityProfile,
   ORDERS,
-} from '../../../gameEngine/battleEngine'
-import { computeDuelShare } from '../../../gameEngine/duelEngine'
-import { SHOW_DEBUG_NUMBERS } from '../../../config/features'
+} from '../../../../gameEngine/battleEngine'
+import { computeDuelShare } from '../../../../gameEngine/duelEngine'
+import { SHOW_DEBUG_NUMBERS } from '../../../../config/features'
 
 // v2 (pacing pass): renamed from the old flat TICK_INTERVAL_MS. The
 // ACTUAL interval used is dynamic per fight — see dynamicTickInterval

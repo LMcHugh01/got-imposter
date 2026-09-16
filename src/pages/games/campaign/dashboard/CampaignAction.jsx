@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { fetchRandomEnemyHouse } from '../../../lib/enemyHouseService'
-import { recruit, recover } from '../../../gameEngine/economy'
-import { attemptAlliance, computeAllianceChance } from '../../../gameEngine/diplomacy'
-import { gatherIntelligence } from '../../../gameEngine/intelligence'
-import { SHOW_DEBUG_NUMBERS } from '../../../config/features'
+import { fetchRandomEnemyHouse } from '../../../../lib/enemyHouseService'
+import { recruit, recover } from '../../../../gameEngine/economy'
+import { attemptAlliance, computeAllianceChance } from '../../../../gameEngine/diplomacy'
+import { gatherIntelligence } from '../../../../gameEngine/intelligence'
+import { SHOW_DEBUG_NUMBERS } from '../../../../config/features'
 
 const RECRUIT_PRESETS = [2000, 5000, 10000]
 const RECOVER_PRESETS = [2000, 3000, 5000]

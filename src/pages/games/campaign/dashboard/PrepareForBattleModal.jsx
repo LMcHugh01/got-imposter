@@ -1,5 +1,5 @@
-import { FORMATIONS } from '../../../gameEngine/battleEngine'
-import { STRATEGY_INFO, OPENING_STRATEGIES, FORMATION_INFO, FORMATION_ORDER } from './Battle'
+import { FORMATIONS } from '../../../../gameEngine/battleEngine'
+import { STRATEGY_INFO, OPENING_STRATEGIES, FORMATION_INFO, FORMATION_ORDER } from '../battle/Battle'
 
 const TERRAIN_LABELS = {
   plains: 'Plains',
@@ -12,7 +12,7 @@ const TERRAIN_LABELS = {
 /**
  * pages/games/draft/PrepareForBattleModal.jsx
  *
- * Opened from the "Prepare for Battle" button on EnemyHouseOverview.
+ * Opened from the "Prepare for Battle" button on EnemyScoutReport.
  * Shows the fogged terrain shortlist (same shape/source as the
  * personality shortlist — gatherIntelligence's terrainShortlist), then
  * the Formation + opening Strategy pickers (the same

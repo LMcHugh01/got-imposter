@@ -1,4 +1,4 @@
-import { extractCouncilBattleInputs } from '../../../gameEngine/battleEngine'
+import { extractCouncilBattleInputs } from '../../../../gameEngine/battleEngine'
 
 function troopTotal(troops) {
   return troops.infantry + troops.archers + troops.cavalry

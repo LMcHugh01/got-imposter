@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import PageWrapper from '../../../components/PageWrapper'
 import { fetchDraftablePool } from '../../../lib/characterAttributesService'
-import { fetchRandomEnemyHouse } from '../../../lib/enemyHouseService'
 import { ROLES } from '../../../data/roleWeights'
 import {
   createDraftState,
@@ -10,29 +9,26 @@ import {
   isDraftComplete,
   getFinalRoster,
 } from '../../../gameEngine/draftEngine'
-import { gatherIntelligence } from '../../../gameEngine/intelligence'
-import {
-  createCampaign,
-  getCurrentTier,
-  isFinalBattle,
-  recordBattleResult,
-  summarizeCampaign,
-  TOTAL_BATTLES,
-} from '../../../gameEngine/campaign'
-import { buildBattleSides } from './battleSides'
 import RoleGrid from './RoleGrid'
 import DraftBoard from './DraftBoard'
 import DraftOathModal from './DraftOathModal'
 import DraftLedger from './DraftLedger'
 import Roster from './Roster'
-import CampaignDashboard from './CampaignDashboard'
-import Battle from './Battle'
-import BattleResult from './BattleResult'
-import CampaignVictory from './CampaignVictory'
+import DraftIntro from './DraftIntro'
 
+/**
+ * pages/games/draft/Draft.jsx
+ *
+ * The standalone Draft game — build the highest-average-rating council
+ * you can, from the same pool/engine/UI as the Campaign game's drafting
+ * phase, just without anything past the roster reveal: no
+ * campaign/battle, no "Begin Campaign" step. The game ends the moment
+ * the 10th role is filled.
+ */
 export default function Draft() {
-  const [status, setStatus] = useState('loading') // loading | error | drafting | complete | dashboard | battle | battleResult | campaignVictory
+  const [status, setStatus] = useState('intro') // intro | loading | error | drafting | complete
   const [error, setError] = useState(null)
+  const [houseName, setHouseName] = useState('')
   const [draftState, setDraftState] = useState(null)
   const [selectedCharacter, setSelectedCharacter] = useState(null)
   // The role the player targeted (by clicking an open seat in RoleGrid)
@@ -44,42 +40,22 @@ export default function Draft() {
   // drives the post-assignment ledger view. Cleared when the player
   // dismisses it via "Summon the Next Five" / "Seat the Council".
   const [justSworn, setJustSworn] = useState(null)
-  const [campaign, setCampaign] = useState(null)
-  const [enemyHouse, setEnemyHouse] = useState(null)
-  const [battleResult, setBattleResult] = useState(null)
-  const [scouted, setScouted] = useState(false)
-  const [intelReport, setIntelReport] = useState(null)
-  // Set by CampaignDashboard's Battle Tactics panel the moment the player
-  // commits to an opening move — { formationId, strategyId } for a fresh
-  // attempt, or null when resuming a retreated engagement (Battle.jsx
-  // pulls formation/tick-count from `engagement` in that case instead).
-  const [battleStart, setBattleStart] = useState(null)
-  // Retreat-and-reattempt (BATTLE_PLAN.md §15) — one continuous engagement
-  // you can pause and resume, not two separate battles. `engagement` is
-  // null for a fresh fight; once set (via handleRetreat), it carries the
-  // live army counts and the enemy's cumulative casualties across a fresh
-  // pre-battle action window and back into Battle. Cleared the moment the
-  // fight actually resolves (handleBattleComplete) — a win, a surrender,
-  // or a failed Rally all end the engagement, not just a retreat.
-  const [engagement, setEngagement] = useState(null)
-  const [rallyUsedThisEngagement, setRallyUsedThisEngagement] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
+  // Gated behind DraftIntro's "Play Now" instead of firing on mount — the
+  // player names their house first, and that's what actually kicks off
+  // the pool fetch / draft state creation.
+  const handlePlay = useCallback((name) => {
+    setHouseName(name)
+    setStatus('loading')
     fetchDraftablePool()
       .then((pool) => {
-        if (cancelled) return
         setDraftState(createDraftState(pool))
         setStatus('drafting')
       })
       .catch((err) => {
-        if (cancelled) return
         setError(err.message)
         setStatus('error')
       })
-    return () => {
-      cancelled = true
-    }
   }, [])
 
   // Recomputes only when draftState actually changes (i.e. once per round),
@@ -135,8 +111,9 @@ export default function Draft() {
   // Step 3: the player dismisses the ledger ("Summon the Next Five" /
   // "Seat the Council"). draftState was already advanced back in
   // handleConfirmOath, so the next offer is already sitting in `offer` —
-  // this just switches the visible panel back to picking, or on to the
-  // completed-roster screen if that was the last seat.
+  // this just switches the visible panel back to picking. On the 10th
+  // and final seat, the game is over — straight to the roster reveal,
+  // there's nothing past it in this game.
   const handleDismissLedger = useCallback(() => {
     if (draftState && isDraftComplete(draftState)) {
       setStatus('complete')
@@ -144,104 +121,25 @@ export default function Draft() {
     setJustSworn(null)
   }, [draftState])
 
-  const handleBeginCampaign = useCallback(async () => {
-    setStatus('loading')
-    try {
-      const roster = getFinalRoster(draftState)
-      const newCampaign = createCampaign(roster)
-      const house = await fetchRandomEnemyHouse(getCurrentTier(newCampaign), newCampaign.usedEnemyHouseIds)
-      setCampaign(newCampaign)
-      setEnemyHouse(house)
-      setScouted(false)
-      setIntelReport(null)
-      setBattleStart(null)
-      setStatus('dashboard')
-    } catch (err) {
-      setError(err.message)
-      setStatus('error')
-    }
-  }, [draftState])
-
-  // Fired by CampaignDashboard whenever a pre-battle action resolves (or
-  // is skipped) inside its modal. No navigation here — the dashboard
-  // stays put; it just commits the updated resources/intel into campaign
-  // state so the persistent Council/Resources panels and the Battle
-  // Tactics power-share numbers immediately reflect it.
-  const handleActionComplete = useCallback(({ resources, scouted: didScout, intelReport: report }) => {
-    setCampaign((c) => ({ ...c, resources }))
-    setScouted(didScout)
-    setIntelReport(report)
+  // "Draft Again" — a full reset back to naming a new house, so the
+  // player can try to beat their average rating with a fresh pool.
+  const handlePlayAgain = useCallback(() => {
+    setDraftState(null)
+    setSelectedCharacter(null)
+    setPendingRoleId(null)
+    setJustSworn(null)
+    setHouseName('')
+    setError(null)
+    setStatus('intro')
   }, [])
 
-  // Fired by CampaignDashboard's Battle Tactics panel once the player
-  // commits to an opening move (or, when resuming a retreated engagement,
-  // just to "Resume Battle" — strategyId is null in that case, and
-  // Battle.jsx pulls its formation/tick-count from `engagement` instead).
-  const handleMarchToBattle = useCallback((formationId, strategyId) => {
-    setBattleStart(strategyId ? { formationId, strategyId } : null)
-    setStatus('battle')
-  }, [])
-
-  // Battle.jsx now owns the entire live fight internally (ticking army
-  // counts, mid-fight strategy switches, surrender) and only calls this
-  // once, when the fight is actually decided. The Duel Offer panel on the
-  // dashboard calls the exact same handler with the exact same result
-  // shape (finalizeDuelResult mirrors finalizeBattleResult) — this
-  // function doesn't need to know which one happened.
-  const handleBattleComplete = useCallback((finalResult) => {
-    setBattleResult(finalResult)
-    setEngagement(null)
-    setRallyUsedThisEngagement(false)
-    setStatus('battleResult')
-  }, [])
-
-  // Retreat (BATTLE_PLAN.md §15) — deliberately does NOT call
-  // recordBattleResult: no battleLog entry, battleNumber doesn't advance,
-  // enemyHouse isn't added to usedEnemyHouseIds. It's a pause, not a
-  // result. Routes back to the dashboard for a fresh pre-battle action
-  // window (using whatever resources are left) rather than straight back
-  // to Battle, then resumes from the persisted counts.
-  const handleRetreat = useCallback(({ yourTroops, enemyTroops, enemyCumulativeCasualties, rallyUsed, formationId, ticksElapsed, enemyProfile }) => {
-    setEngagement({ yourTroops, enemyTroops, enemyCumulativeCasualties, formationId, ticksElapsed, enemyProfile })
-    setRallyUsedThisEngagement(rallyUsed)
-    setScouted(false)
-    setIntelReport(null)
-    setBattleStart(null)
-    setStatus('dashboard')
-  }, [])
-
-  // Campaign/enemyHouse (and any campaign-action spend) are untouched by a
-  // failed attempt (results are only committed via handleContinue/
-  // handleClaimVictory) — so retrying just goes back to the dashboard to
-  // pick tactics again, keeping whatever intel/recruits you already have
-  // for this fight. A duel loss also routes here on "Try Again".
-  const handleRetry = useCallback(() => {
-    setBattleStart(null)
-    setStatus('dashboard')
-  }, [])
-
-  const handleContinue = useCallback(async () => {
-    setStatus('loading')
-    try {
-      const nextCampaign = recordBattleResult(campaign, enemyHouse, battleResult)
-      const house = await fetchRandomEnemyHouse(getCurrentTier(nextCampaign), nextCampaign.usedEnemyHouseIds)
-      setCampaign(nextCampaign)
-      setEnemyHouse(house)
-      setScouted(false)
-      setIntelReport(null)
-      setBattleStart(null)
-      setStatus('dashboard')
-    } catch (err) {
-      setError(err.message)
-      setStatus('error')
-    }
-  }, [campaign, enemyHouse, battleResult])
-
-  const handleClaimVictory = useCallback(() => {
-    const finalCampaign = recordBattleResult(campaign, enemyHouse, battleResult)
-    setCampaign(finalCampaign)
-    setStatus('campaignVictory')
-  }, [campaign, enemyHouse, battleResult])
+  if (status === 'intro') {
+    return (
+      <PageWrapper className="justify-center">
+        <DraftIntro onPlay={handlePlay} />
+      </PageWrapper>
+    )
+  }
 
   if (status === 'loading') {
     return (
@@ -274,94 +172,16 @@ export default function Draft() {
     const roster = getFinalRoster(draftState)
     return (
       <PageWrapper className="justify-start">
-        <Roster roster={roster} />
+        <Roster roster={roster} houseName={houseName} />
         <div className="w-full max-w-sm pb-4">
           <button
-            onClick={handleBeginCampaign}
-            className="w-full py-4 rounded border border-got-red bg-got-red/10 text-got-red-bright text-lg tracking-widest uppercase transition-all duration-200 hover:bg-got-red/20 active:scale-[0.98]"
+            onClick={handlePlayAgain}
+            className="w-full py-4 rounded border border-got-gold bg-got-gold/10 text-got-gold text-lg tracking-widest uppercase transition-all duration-200 hover:bg-got-gold/20 active:scale-[0.98]"
             style={{ fontFamily: 'Cinzel, serif' }}
           >
-            Begin Campaign
+            Draft Again
           </button>
         </div>
-      </PageWrapper>
-    )
-  }
-
-  if (status === 'dashboard') {
-    return (
-      <PageWrapper className="justify-start">
-        <CampaignDashboard
-          campaign={campaign}
-          enemyHouse={enemyHouse}
-          engagement={engagement}
-          scouted={scouted}
-          intelReport={intelReport}
-          onActionComplete={handleActionComplete}
-          onMarch={handleMarchToBattle}
-          onDuelResult={handleBattleComplete}
-        />
-      </PageWrapper>
-    )
-  }
-
-  if (status === 'battle') {
-    const { yourSide, enemySide } = buildBattleSides(campaign, enemyHouse, scouted)
-    // Never show the exact enemy army size — use the real gathered report
-    // if Intelligence was used this round, otherwise a worst-case blind
-    // range (masterOfWhispersRating: 0) computed the same way.
-    const displayReport =
-      scouted && intelReport ? intelReport : gatherIntelligence({ masterOfWhispersRating: 0, enemyHouse })
-    const enemyArmyRange = { low: displayReport.armyRangeLow, high: displayReport.armyRangeHigh }
-    return (
-      <PageWrapper className="justify-start">
-        <div className="w-full max-w-sm pt-4">
-          <p
-            className="text-stone-600 text-xs tracking-[0.3em] uppercase text-center"
-            style={{ fontFamily: 'Cinzel, serif' }}
-          >
-            Battle {campaign.battleNumber} of {TOTAL_BATTLES}
-            {scouted && ' · Scouted'}
-          </p>
-        </div>
-        <Battle
-          yourSide={yourSide}
-          enemySide={enemySide}
-          enemyArmyRange={enemyArmyRange}
-          onComplete={handleBattleComplete}
-          onRetreat={handleRetreat}
-          engagement={engagement}
-          canRetreat={!engagement}
-          rallyAvailable={!rallyUsedThisEngagement}
-          initialFormationId={battleStart?.formationId ?? null}
-          initialStrategyId={battleStart?.strategyId ?? null}
-        />
-      </PageWrapper>
-    )
-  }
-
-  if (status === 'battleResult') {
-    return (
-      <PageWrapper className="justify-start">
-        <BattleResult
-          result={battleResult}
-          enemyHouse={enemyHouse}
-          battleNumber={campaign.battleNumber}
-          totalBattles={TOTAL_BATTLES}
-          isFinalBattle={isFinalBattle(campaign)}
-          campaignSummary={summarizeCampaign(campaign)}
-          onRetry={handleRetry}
-          onContinue={handleContinue}
-          onClaimVictory={handleClaimVictory}
-        />
-      </PageWrapper>
-    )
-  }
-
-  if (status === 'campaignVictory') {
-    return (
-      <PageWrapper className="justify-start">
-        <CampaignVictory summary={summarizeCampaign(campaign)} />
       </PageWrapper>
     )
   }
@@ -389,7 +209,7 @@ export default function Draft() {
                 The Draft
               </p>
               <h1 className="text-got-parchment text-xl font-semibold mt-1" style={{ fontFamily: 'Cinzel, serif' }}>
-                Your Council
+                House {houseName}
               </h1>
             </div>
             {overallFit !== null && (
