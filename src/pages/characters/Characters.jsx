@@ -77,8 +77,6 @@ const STYLE_GROUPS = [
 ]
 const STYLE_GROUP_BY_KEY = Object.fromEntries(STYLE_GROUPS.map((g) => [g.key, g]))
 
-const GRID_COLS = `minmax(196px,1.7fr) 74px repeat(${CATEGORIES.length},minmax(50px,.62fr)) 128px`
-
 function average(values) {
   const nums = values.filter((v) => typeof v === 'number')
   if (!nums.length) return null
@@ -115,7 +113,9 @@ function barColor(v, keyed) {
 // which roles are style-driven. `character` just needs to be the whole
 // character object — weightsFor() reads whichever of fightingStyle/
 // leadershipStyle/commandStyle/coinStyle the role actually needs and
-// ignores the rest.
+// ignores the rest. Only used here to decide which attributes get the
+// gold "keyed" highlight — the actual coefficient numbers are never
+// displayed (see the Attributes panel below).
 function coefficientsForRole(roleId, character) {
   if (!roleId || !character) return null
   return weightsFor(roleId, character)
@@ -182,32 +182,6 @@ function GhostButton({ onClick, small, children }) {
   )
 }
 
-function GoldButton({ onClick, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        border: `1px solid ${GOLD}`,
-        background: 'linear-gradient(#d3b169,#b3904a)',
-        color: '#17120b',
-        fontFamily: CINZEL,
-        fontWeight: 600,
-        fontSize: 11,
-        letterSpacing: '.16em',
-        textTransform: 'uppercase',
-        padding: '12px 15px',
-        minHeight: 44,
-        cursor: 'pointer',
-        borderRadius: 0,
-        flex: 'none',
-      }}
-    >
-      {children}
-    </button>
-  )
-}
-
 const selectStyle = {
   flex: '1 1 175px',
   minWidth: 0,
@@ -233,6 +207,7 @@ export default function Characters() {
   const [error, setError] = useState(null)
 
   const [selectedId, setSelectedId] = useState(null)
+  const [openCategories, setOpenCategories] = useState({})
   const [query, setQuery] = useState('')
   const [houseFilter, setHouseFilter] = useState('all')
   const [styleFilter, setStyleFilter] = useState('all')
@@ -240,8 +215,6 @@ export default function Characters() {
   const [attributeFilter, setAttributeFilter] = useState('')
   const [sortKey, setSortKey] = useState('fit')
   const [sortDir, setSortDir] = useState('desc')
-  const [showCoefficients, setShowCoefficients] = useState(true)
-  const [sheetOpen, setSheetOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -266,12 +239,6 @@ export default function Characters() {
 
   const rows = useMemo(() => {
     return characters.map((c) => {
-      // Pass the whole character, not just fightingStyle — allRoleRatings
-      // needs leadershipStyle for King/Hand/Consort, commandStyle for
-      // Commander, and coinStyle for Master of Coin too. Any role whose
-      // required style isn't set on this character comes back null
-      // (graceful "not yet knowable"), same as it always has for an
-      // untagged Champion.
       const roleFits = c.attributes ? allRoleRatings(c.attributes, c) : null
       const ladder = ROLES.map((r) => ({
         roleId: r.id,
@@ -286,8 +253,6 @@ export default function Characters() {
     })
   }, [characters])
 
-  // The Attribute column only exists while an attribute is chosen — if it's
-  // cleared while the table happens to be sorted by it, fall back to Fit.
   useEffect(() => {
     if (!attributeFilter && sortKey === 'attribute') {
       setSortKey('fit')
@@ -361,16 +326,20 @@ export default function Characters() {
   const sortArrow = (key) => (sortKey === key ? (sortDir === 'desc' ? ' ↓' : ' ↑') : '')
 
   const selected = rows.find((c) => c.id === selectedId) ?? null
+
+  // Every category starts collapsed for a newly selected character.
+  useEffect(() => {
+    setOpenCategories({})
+  }, [selectedId])
   const ladderRoleId = activeRole ? activeRole.id : selected?.best?.roleId ?? null
   const highlightedWeights = selected ? coefficientsForRole(ladderRoleId, selected) : null
   const selectedFit = selected ? fitFor(selected) : null
   const rosterTitle = activeRole ? `Ranked as ${activeRole.label}` : 'Ranked by best fit'
-  const gridCols = `${GRID_COLS}${attributeFilter ? ' 70px' : ''}`
+  const gridCols = `minmax(196px,1.7fr)${attributeFilter ? ' 70px' : ''} 74px repeat(${CATEGORIES.length},minmax(50px,.62fr)) 128px`
 
   return (
     <PageWrapper className="!p-0 !items-stretch">
       <div style={{ background: BG, color: TEXT_BODY, fontFamily: GARAMOND, minHeight: '100vh', width: '100%', paddingBottom: 96, position: 'relative' }}>
-        {/* Ambient texture */}
         <div
           style={{
             position: 'fixed',
@@ -382,7 +351,6 @@ export default function Characters() {
         />
 
         <div style={{ position: 'relative', maxWidth: 1240, margin: '0 auto', padding: '0 16px' }}>
-          {/* Header */}
           <header style={{ padding: '26px 0 20px', textAlign: 'center' }}>
             <div style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.38em', color: TEXT_FAINT, textTransform: 'uppercase' }}>
               The Archive
@@ -405,81 +373,325 @@ export default function Characters() {
           {error && <p style={{ textAlign: 'center', color: '#c08d80', padding: '48px 0' }}>{error}</p>}
 
           {!loading && !error && (
-            <>
-              {/* Hero */}
-              <section
+            <section style={{ padding: '22px 0 0' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9, alignItems: 'center' }}>
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search by name or house"
+                  style={{
+                    flex: '2 1 220px',
+                    minWidth: 0,
+                    background: INPUT_BG,
+                    border: `1px solid ${BORDER_SOFT}`,
+                    color: TEXT_BODY,
+                    fontSize: 13,
+                    letterSpacing: '.08em',
+                    padding: '12px 13px',
+                    outline: 'none',
+                    minHeight: 46,
+                    fontFamily: GARAMOND,
+                  }}
+                />
+                <select value={houseFilter} onChange={(e) => setHouseFilter(e.target.value)} style={selectStyle}>
+                  <option value="all">All houses</option>
+                  {houses.map((h) => (
+                    <option key={h} value={h}>
+                      {h}
+                    </option>
+                  ))}
+                </select>
+                <select value={styleFilter} onChange={(e) => setStyleFilter(e.target.value)} style={selectStyle}>
+                  <option value="all">All styles</option>
+                  {STYLE_GROUPS.map((group) => (
+                    <optgroup key={group.key} label={group.label}>
+                      {group.options.map((s) => (
+                        <option key={`${group.key}:${s}`} value={`${group.key}:${s}`}>
+                          {group.labels[s]}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} style={selectStyle}>
+                  <option value="bestFit">Role · Best fit</option>
+                  {ROLES.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      Role · {r.label}
+                    </option>
+                  ))}
+                </select>
+                <select value={attributeFilter} onChange={(e) => setAttributeFilter(e.target.value)} style={selectStyle}>
+                  <option value="">Attribute · none</option>
+                  {ALL_ATTRIBUTE_KEYS.map((key) => (
+                    <option key={key} value={key}>
+                      Attribute · {ATTRIBUTE_LABELS[key]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
+                <div style={{ width: 8, height: 8, flex: 'none', border: `1px solid ${ACCENT}`, transform: 'rotate(45deg)' }} />
+                <div style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.26em', color: TEXT_LABEL, textTransform: 'uppercase' }}>
+                  {rosterTitle}
+                </div>
+                <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${BORDER}, transparent)` }} />
+                <div style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.16em', color: TEXT_MUTED, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                  {sorted.length} of {characters.length}
+                </div>
+              </div>
+
+              <div style={{ overflowX: 'auto', marginTop: 6 }}>
+                <div style={{ minWidth: 730 }}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: gridCols,
+                      gap: 10,
+                      alignItems: 'end',
+                      padding: '12px 8px 9px',
+                      borderBottom: `1px solid ${BORDER_GRID}`,
+                    }}
+                  >
+                    <div onClick={() => handleSort('name')} title="Sort by name" style={headerCellStyle('name')}>
+                      Name{sortArrow('name')}
+                    </div>
+                    {attributeFilter && (
+                      <div
+                        onClick={() => handleSort('attribute')}
+                        title={ATTRIBUTE_LABELS[attributeFilter]}
+                        style={headerCellStyle('attribute', 'right')}
+                      >
+                        {ATTRIBUTE_SHORT_LABELS[attributeFilter] ?? 'ATTR'}
+                        {sortArrow('attribute')}
+                      </div>
+                    )}
+                    <div onClick={() => handleSort('fit')} title="Role fit" style={headerCellStyle('fit', 'center')}>
+                      OVR{sortArrow('fit')}
+                    </div>
+                    {CATEGORIES.map((cat) => (
+                      <div key={cat.id} onClick={() => handleSort(cat.id)} title={cat.label} style={headerCellStyle(cat.id, 'center')}>
+                        {cat.code}
+                        {sortArrow(cat.id)}
+                      </div>
+                    ))}
+                    <div onClick={() => handleSort('style')} title={activeStyleGroup.label} style={headerCellStyle('style', 'right')}>
+                      {styleFilter === 'all' ? 'Style' : activeStyleGroup.label}{sortArrow('style')}
+                    </div>
+                  </div>
+
+                  {sorted.map((c) => {
+                    const on = c.id === selectedId
+                    const fit = fitFor(c)
+                    return (
+                      <div
+                        key={c.id}
+                        onClick={() => setSelectedId((current) => (current === c.id ? null : c.id))}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: gridCols,
+                          gap: 10,
+                          alignItems: 'center',
+                          padding: '11px 8px',
+                          cursor: 'pointer',
+                          borderBottom: `1px solid ${BORDER_ROW}`,
+                          borderLeft: on ? `2px solid ${GOLD}` : '2px solid transparent',
+                          background: on ? 'linear-gradient(90deg,rgba(201,167,90,.13),transparent 65%)' : 'transparent',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
+                          <div
+                            style={{
+                              width: 9,
+                              height: 9,
+                              flex: 'none',
+                              transform: 'rotate(45deg)',
+                              border: '1px solid ' + ((fit ?? 0) >= 85 ? ACCENT : '#2f281c'),
+                              background: (fit ?? 0) >= 85 ? GOLD : 'transparent',
+                            }}
+                          />
+                          <div style={{ minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontFamily: CINZEL,
+                                fontSize: 15.5,
+                                lineHeight: 1.25,
+                                color: on ? TEXT_BRIGHT : '#e8dcc2',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              {c.name}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 14,
+                                lineHeight: 1.3,
+                                color: '#8f8571',
+                                fontStyle: 'italic',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              {c.house}
+                            </div>
+                          </div>
+                        </div>
+                        {attributeFilter && (
+                          <div style={{ fontFamily: CINZEL, fontSize: 15, textAlign: 'right', color: tier(c.attributes?.[attributeFilter]).color }}>
+                            {c.attributes?.[attributeFilter] ?? '—'}
+                          </div>
+                        )}
+                        <div style={{ fontFamily: CINZEL, fontWeight: 700, fontSize: 18, textAlign: 'center', color: tier(fit).color }}>
+                          {fit ?? '—'}
+                        </div>
+                        {CATEGORIES.map((cat) => {
+                          const v = c.categoryAverages?.[cat.id]
+                          return (
+                            <div key={cat.id} style={{ fontFamily: CINZEL, fontSize: 15, textAlign: 'center', color: tier(v).color }}>
+                              {v ?? '—'}
+                            </div>
+                          )
+                        })}
+                        <div
+                          style={{
+                            fontFamily: CINZEL,
+                            fontSize: 10.5,
+                            letterSpacing: '.14em',
+                            textTransform: 'uppercase',
+                            textAlign: 'right',
+                            color: TEXT_MUTED,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {c[activeStyleGroup.key] ? activeStyleGroup.labels[c[activeStyleGroup.key]] : 'Unset'}
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {sorted.length === 0 && (
+                    <div style={{ padding: '34px 8px', fontSize: 16, color: TEXT_MUTED, fontStyle: 'italic' }}>
+                      No one in the archive answers to that.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 20px', padding: '16px 8px 0' }}>
+                {CATEGORIES.map((cat) => (
+                  <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <span style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.14em', color: TEXT_LABEL, textTransform: 'uppercase' }}>
+                      {cat.code}
+                    </span>
+                    <span style={{ fontSize: 15, color: TEXT_MUTED }}>{cat.label}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+
+        <AnimatePresence>
+          {selected && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                onClick={() => setSelectedId(null)}
+                style={{ position: 'absolute', inset: 0, background: 'rgba(4,4,4,.86)' }}
+              />
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 24 }}
+                transition={{ duration: 0.24, ease: 'easeOut' }}
                 style={{
                   position: 'relative',
-                  padding: '20px 0 26px',
-                  borderTop: `1px solid ${BORDER_SOFT}`,
-                  borderBottom: `1px solid ${BORDER_FAINT}`,
-                  background: 'radial-gradient(760px 320px at 16% 0%, rgba(201,167,90,.08), transparent 68%)',
+                  width: '100%',
+                  maxWidth: 1180,
+                  maxHeight: '90vh',
+                  overflowY: 'auto',
+                  border: `1px solid ${BORDER}`,
+                  background: `linear-gradient(${SHEET_TOP}, ${SHEET_BOTTOM})`,
+                  padding: '22px 26px 30px',
                 }}
               >
-                {!selected ? (
-                  <div style={{ padding: '18px 4px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ fontSize: 22 }}>📜</span>
-                    <p style={{ margin: 0, fontSize: 15.5, fontStyle: 'italic', color: TEXT_MUTED }}>
-                      Select a character from the roster below to see their full attribute and role-fit breakdown.
-                    </p>
-                  </div>
-                ) : (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+                  <GhostButton small onClick={() => setSelectedId(null)}>
+                    Close
+                  </GhostButton>
+                </div>
+
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '26px 34px' }}>
-                  {/* Identity */}
-                  <div style={{ flex: '1 1 236px', minWidth: 0, display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                    <div
-                      style={{
-                        width: 74,
-                        height: 92,
-                        flex: 'none',
-                        border: `1px solid ${BORDER}`,
-                        background: `linear-gradient(${PANEL_1}, ${PANEL_2})`,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 6,
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {selected.image_url ? (
-                        <img src={selected.image_url} alt={selected.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        <>
-                          <span style={{ fontFamily: CINZEL, fontWeight: 600, fontSize: 19, color: GOLD }}>{initials(selected.name)}</span>
-                          <span style={{ fontFamily: CINZEL, fontSize: 8.5, letterSpacing: '.16em', color: '#6d6352', textTransform: 'uppercase' }}>
-                            Portrait
-                          </span>
-                        </>
-                      )}
+                  <div style={{ flex: '1 1 236px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {/* Top: image + name/house */}
+                    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                      <div
+                        style={{
+                          width: 74,
+                          height: 92,
+                          flex: 'none',
+                          border: `1px solid ${BORDER}`,
+                          background: `linear-gradient(${PANEL_1}, ${PANEL_2})`,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {selected.image_url ? (
+                          <img src={selected.image_url} alt={selected.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <>
+                            <span style={{ fontFamily: CINZEL, fontWeight: 600, fontSize: 19, color: GOLD }}>{initials(selected.name)}</span>
+                            <span style={{ fontFamily: CINZEL, fontSize: 8.5, letterSpacing: '.16em', color: '#6d6352', textTransform: 'uppercase' }}>
+                              Portrait
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <h2 style={{ margin: 0, fontFamily: CINZEL, fontWeight: 700, fontSize: 25, lineHeight: 1.15, color: TEXT_BRIGHT }}>
+                          {selected.name}
+                        </h2>
+                        <div style={{ fontSize: 16, color: TEXT_MUTED, fontStyle: 'italic', marginTop: 3 }}>{selected.house || '—'}</div>
+                      </div>
                     </div>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <h2 style={{ margin: 0, fontFamily: CINZEL, fontWeight: 700, fontSize: 25, lineHeight: 1.15, color: TEXT_BRIGHT }}>
-                        {selected.name}
-                      </h2>
-                      <div style={{ fontSize: 16, color: TEXT_MUTED, fontStyle: 'italic', marginTop: 3 }}>{selected.house || '—'}</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 13 }}>
+
+                    {/* Below: styles, full width — fills the space the
+                        short image leaves under it */}
+                    <div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 18px' }}>
                         {STYLE_GROUPS.map((group) =>
                           selected[group.key] ? (
-                            <div key={group.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'baseline', gap: 6, fontSize: 14 }}>
-                              <span
+                            <div key={group.key} style={{ fontSize: 14 }}>
+                              <div
                                 style={{
                                   fontFamily: CINZEL,
                                   fontSize: 10.5,
                                   letterSpacing: '.12em',
                                   color: TEXT_FAINT,
                                   textTransform: 'uppercase',
-                                  flex: 'none',
                                 }}
                               >
                                 {group.label}:
-                              </span>
-                              <span style={{ color: TEXT_BODY }}>{group.labels[selected[group.key]]}</span>
+                              </div>
+                              <div style={{ color: TEXT_BODY }}>{group.labels[selected[group.key]]}</div>
                             </div>
                           ) : null
                         )}
                         {STYLE_GROUPS.every((group) => !selected[group.key]) && (
-                          <div style={{ fontSize: 14, fontStyle: 'italic', color: TEXT_MUTED }}>No style set</div>
+                          <div style={{ gridColumn: '1 / -1', fontSize: 14, fontStyle: 'italic', color: TEXT_MUTED }}>No style set</div>
                         )}
                       </div>
                       {!selected.attributes && (
@@ -490,24 +702,17 @@ export default function Characters() {
                     </div>
                   </div>
 
-                  {/* Attributes */}
                   {selected.attributes && (
                     <div style={{ flex: '3 1 480px', minWidth: 0 }}>
-                      <SectionLabel
-                        right={
-                          <GhostButton small onClick={() => setShowCoefficients((v) => !v)}>
-                            {showCoefficients ? 'Hide coefficients' : 'Show coefficients'}
-                          </GhostButton>
-                        }
-                      >
-                        Attributes
-                      </SectionLabel>
+                      <SectionLabel>Attributes</SectionLabel>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(228px,1fr))', gap: '18px 30px' }}>
                         {CATEGORIES.map((cat) => {
                           const avg = selected.categoryAverages?.[cat.id]
+                          const isOpen = !!openCategories[cat.id]
                           return (
                             <div key={cat.id}>
                               <div
+                                onClick={() => setOpenCategories((prev) => ({ ...prev, [cat.id]: !prev[cat.id] }))}
                                 style={{
                                   display: 'flex',
                                   justifyContent: 'space-between',
@@ -515,14 +720,18 @@ export default function Characters() {
                                   gap: 10,
                                   paddingBottom: 7,
                                   borderBottom: `1px solid ${BORDER_HAIR}`,
+                                  cursor: 'pointer',
+                                  userSelect: 'none',
                                 }}
                               >
-                                <span style={{ fontFamily: CINZEL, fontSize: 10.5, letterSpacing: '.24em', color: TEXT_FAINT, textTransform: 'uppercase' }}>
+                                <span style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontFamily: CINZEL, fontSize: 10.5, letterSpacing: '.24em', color: TEXT_FAINT, textTransform: 'uppercase' }}>
+                                  <span style={{ display: 'inline-block', width: 9, color: ACCENT }}>{isOpen ? '▾' : '▸'}</span>
                                   {cat.label}
                                 </span>
                                 <span style={{ fontFamily: CINZEL, fontWeight: 600, fontSize: 15, color: tier(avg).color }}>{avg ?? '—'}</span>
                               </div>
-                              {cat.keys.map((key) => {
+                              {isOpen &&
+                                cat.keys.map((key) => {
                                 const value = selected.attributes[key]
                                 const coef = highlightedWeights ? highlightedWeights[key] : undefined
                                 const keyed = coef !== undefined
@@ -554,20 +763,6 @@ export default function Characters() {
                                     <div style={{ flex: 1, height: 4, background: TRACK, minWidth: 34 }}>
                                       <div style={{ width: `${value ?? 0}%`, height: '100%', background: barColor(value, keyed) }} />
                                     </div>
-                                    <span
-                                      style={{
-                                        fontFamily: CINZEL,
-                                        fontSize: 10.5,
-                                        letterSpacing: '.08em',
-                                        color: TEXT_LABEL,
-                                        flex: 'none',
-                                        width: showCoefficients ? 38 : 0,
-                                        textAlign: 'right',
-                                        overflow: 'hidden',
-                                      }}
-                                    >
-                                      {showCoefficients && keyed ? `+${coef.toFixed(2)}` : ''}
-                                    </span>
                                     <span style={{ fontFamily: CINZEL, fontWeight: 600, fontSize: 14, flex: 'none', width: 26, textAlign: 'right', color: tier(value).color }}>
                                       {value ?? '—'}
                                     </span>
@@ -581,7 +776,6 @@ export default function Characters() {
                     </div>
                   )}
 
-                  {/* Seats */}
                   {selected.attributes && (
                     <div style={{ flex: '1 1 262px', minWidth: 0 }}>
                       <SectionLabel>Seats</SectionLabel>
@@ -651,383 +845,6 @@ export default function Characters() {
                     </div>
                   )}
                 </div>
-                )}
-              </section>
-
-              {/* Filters + roster */}
-              <section style={{ padding: '22px 0 0' }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9, alignItems: 'center' }}>
-                  <input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search by name or house"
-                    style={{
-                      flex: '2 1 220px',
-                      minWidth: 0,
-                      background: INPUT_BG,
-                      border: `1px solid ${BORDER_SOFT}`,
-                      color: TEXT_BODY,
-                      fontSize: 13,
-                      letterSpacing: '.08em',
-                      padding: '12px 13px',
-                      outline: 'none',
-                      minHeight: 46,
-                      fontFamily: GARAMOND,
-                    }}
-                  />
-                  <select value={houseFilter} onChange={(e) => setHouseFilter(e.target.value)} style={selectStyle}>
-                    <option value="all">All houses</option>
-                    {houses.map((h) => (
-                      <option key={h} value={h}>
-                        {h}
-                      </option>
-                    ))}
-                  </select>
-                  <select value={styleFilter} onChange={(e) => setStyleFilter(e.target.value)} style={selectStyle}>
-                    <option value="all">All styles</option>
-                    {STYLE_GROUPS.map((group) => (
-                      <optgroup key={group.key} label={group.label}>
-                        {group.options.map((s) => (
-                          <option key={`${group.key}:${s}`} value={`${group.key}:${s}`}>
-                            {group.labels[s]}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                  <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} style={selectStyle}>
-                    <option value="bestFit">Role · Best fit</option>
-                    {ROLES.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        Role · {r.label}
-                      </option>
-                    ))}
-                  </select>
-                  <select value={attributeFilter} onChange={(e) => setAttributeFilter(e.target.value)} style={selectStyle}>
-                    <option value="">Attribute · none</option>
-                    {ALL_ATTRIBUTE_KEYS.map((key) => (
-                      <option key={key} value={key}>
-                        Attribute · {ATTRIBUTE_LABELS[key]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
-                  <div style={{ width: 8, height: 8, flex: 'none', border: `1px solid ${ACCENT}`, transform: 'rotate(45deg)' }} />
-                  <div style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.26em', color: TEXT_LABEL, textTransform: 'uppercase' }}>
-                    {rosterTitle}
-                  </div>
-                  <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${BORDER}, transparent)` }} />
-                  <div style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.16em', color: TEXT_MUTED, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-                    {sorted.length} of {characters.length}
-                  </div>
-                </div>
-
-                <div style={{ overflowX: 'auto', marginTop: 6 }}>
-                  <div style={{ minWidth: 730 }}>
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: gridCols,
-                        gap: 10,
-                        alignItems: 'end',
-                        padding: '12px 8px 9px',
-                        borderBottom: `1px solid ${BORDER_GRID}`,
-                      }}
-                    >
-                      <div onClick={() => handleSort('name')} title="Sort by name" style={headerCellStyle('name')}>
-                        Name{sortArrow('name')}
-                      </div>
-                      <div onClick={() => handleSort('fit')} title="Role fit" style={headerCellStyle('fit', 'center')}>
-                        Fit{sortArrow('fit')}
-                      </div>
-                      {CATEGORIES.map((cat) => (
-                        <div key={cat.id} onClick={() => handleSort(cat.id)} title={cat.label} style={headerCellStyle(cat.id, 'center')}>
-                          {cat.code}
-                          {sortArrow(cat.id)}
-                        </div>
-                      ))}
-                      <div onClick={() => handleSort('style')} title={activeStyleGroup.label} style={headerCellStyle('style', 'right')}>
-                        {styleFilter === 'all' ? 'Style' : activeStyleGroup.label}{sortArrow('style')}
-                      </div>
-                      {attributeFilter && (
-                        <div
-                          onClick={() => handleSort('attribute')}
-                          title={ATTRIBUTE_LABELS[attributeFilter]}
-                          style={headerCellStyle('attribute', 'right')}
-                        >
-                          {ATTRIBUTE_SHORT_LABELS[attributeFilter] ?? 'ATTR'}
-                          {sortArrow('attribute')}
-                        </div>
-                      )}
-                    </div>
-
-                    {sorted.map((c) => {
-                      const on = c.id === selectedId
-                      const fit = fitFor(c)
-                      return (
-                        <div
-                          key={c.id}
-                          onClick={() => setSelectedId((current) => (current === c.id ? null : c.id))}
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: gridCols,
-                            gap: 10,
-                            alignItems: 'center',
-                            padding: '11px 8px',
-                            cursor: 'pointer',
-                            borderBottom: `1px solid ${BORDER_ROW}`,
-                            borderLeft: on ? `2px solid ${GOLD}` : '2px solid transparent',
-                            background: on ? 'linear-gradient(90deg,rgba(201,167,90,.13),transparent 65%)' : 'transparent',
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
-                            <div
-                              style={{
-                                width: 9,
-                                height: 9,
-                                flex: 'none',
-                                transform: 'rotate(45deg)',
-                                border: '1px solid ' + ((fit ?? 0) >= 85 ? ACCENT : '#2f281c'),
-                                background: (fit ?? 0) >= 85 ? GOLD : 'transparent',
-                              }}
-                            />
-                            <div style={{ minWidth: 0 }}>
-                              <div
-                                style={{
-                                  fontFamily: CINZEL,
-                                  fontSize: 15.5,
-                                  lineHeight: 1.25,
-                                  color: on ? TEXT_BRIGHT : '#e8dcc2',
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                }}
-                              >
-                                {c.name}
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: 14,
-                                  lineHeight: 1.3,
-                                  color: '#8f8571',
-                                  fontStyle: 'italic',
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                }}
-                              >
-                                {c.house}
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ fontFamily: CINZEL, fontWeight: 700, fontSize: 18, textAlign: 'center', color: tier(fit).color }}>
-                            {fit ?? '—'}
-                          </div>
-                          {CATEGORIES.map((cat) => {
-                            const v = c.categoryAverages?.[cat.id]
-                            return (
-                              <div key={cat.id} style={{ fontFamily: CINZEL, fontSize: 15, textAlign: 'center', color: tier(v).color }}>
-                                {v ?? '—'}
-                              </div>
-                            )
-                          })}
-                          <div
-                            style={{
-                              fontFamily: CINZEL,
-                              fontSize: 10.5,
-                              letterSpacing: '.14em',
-                              textTransform: 'uppercase',
-                              textAlign: 'right',
-                              color: TEXT_MUTED,
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                            }}
-                          >
-                            {c[activeStyleGroup.key] ? activeStyleGroup.labels[c[activeStyleGroup.key]] : 'Unset'}
-                          </div>
-                          {attributeFilter && (
-                            <div style={{ fontFamily: CINZEL, fontSize: 15, textAlign: 'right', color: tier(c.attributes?.[attributeFilter]).color }}>
-                              {c.attributes?.[attributeFilter] ?? '—'}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-
-                    {sorted.length === 0 && (
-                      <div style={{ padding: '34px 8px', fontSize: 16, color: TEXT_MUTED, fontStyle: 'italic' }}>
-                        No one in the archive answers to that.
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 20px', padding: '16px 8px 0' }}>
-                  {CATEGORIES.map((cat) => (
-                    <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <span style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.14em', color: TEXT_LABEL, textTransform: 'uppercase' }}>
-                        {cat.code}
-                      </span>
-                      <span style={{ fontSize: 15, color: TEXT_MUTED }}>{cat.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </>
-          )}
-        </div>
-
-        {/* Fixed "Selected" bar */}
-        {selected && (
-          <div
-            style={{
-              position: 'fixed',
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 40,
-              borderTop: `1px solid ${BORDER_GRID}`,
-              background: 'linear-gradient(rgba(10,9,8,.93),rgba(7,6,6,.98))',
-              backdropFilter: 'blur(6px)',
-            }}
-          >
-            <div style={{ maxWidth: 1240, margin: '0 auto', padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: CINZEL, fontSize: 10.5, letterSpacing: '.22em', color: TEXT_FAINT, textTransform: 'uppercase' }}>
-                  Selected
-                </div>
-                <div style={{ fontSize: 17, color: TEXT_BRIGHT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {selected.name}
-                  {selected.best && ` · ${activeRole ? activeRole.label : selected.best.label} ${selectedFit}`}
-                </div>
-              </div>
-              <GoldButton onClick={() => setSheetOpen(true)}>Full profile</GoldButton>
-            </div>
-          </div>
-        )}
-
-        {/* Full-profile bottom sheet */}
-        <AnimatePresence>
-          {sheetOpen && selected && (
-            <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                onClick={() => setSheetOpen(false)}
-                style={{ position: 'absolute', inset: 0, background: 'rgba(4,4,4,.86)' }}
-              />
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 30 }}
-                transition={{ duration: 0.26, ease: 'easeOut' }}
-                style={{
-                  position: 'relative',
-                  width: '100%',
-                  maxWidth: 620,
-                  maxHeight: '92vh',
-                  overflowY: 'auto',
-                  borderTop: `1px solid ${BORDER}`,
-                  background: `linear-gradient(${SHEET_TOP}, ${SHEET_BOTTOM})`,
-                  padding: '24px 20px 26px',
-                }}
-              >
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.3em', color: '#b0a077', textTransform: 'uppercase' }}>
-                    {selected.fightingStyle ? CHAMPION_STYLE_LABELS[selected.fightingStyle] : 'No style set'}
-                  </div>
-                  <div style={{ fontFamily: CINZEL, fontWeight: 700, fontSize: 24, lineHeight: 1.2, color: TEXT_BRIGHT, marginTop: 8 }}>
-                    {selected.name}
-                  </div>
-                  <div style={{ fontSize: 16, color: TEXT_MUTED, fontStyle: 'italic', marginTop: 3 }}>{selected.house}</div>
-                  {selected.best && (
-                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 9, marginTop: 15 }}>
-                      <div style={{ fontFamily: CINZEL, fontWeight: 700, fontSize: 46, lineHeight: 0.95, color: GOLD_SOFT }}>{selectedFit}</div>
-                      <div style={{ textAlign: 'left', fontFamily: CINZEL, fontSize: 10.5, letterSpacing: '.18em', color: TEXT_FAINT, textTransform: 'uppercase' }}>
-                        Best fit
-                        <br />
-                        {activeRole ? activeRole.label : selected.best.label}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ height: 1, background: BORDER_HAIR, margin: '20px 0 16px' }} />
-
-                <div style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.24em', color: TEXT_FAINT, textTransform: 'uppercase', marginBottom: 10 }}>
-                  Every seat
-                </div>
-                {selected.ladder.map((l) => (
-                  <div key={l.roleId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: `1px solid ${BORDER_ROW}` }}>
-                    <span style={{ fontFamily: CINZEL, fontSize: 13, color: '#d6cbb4', flex: '1 1 0', minWidth: 0 }}>{l.label}</span>
-                    {l.rating != null ? (
-                      <>
-                        <span style={{ fontFamily: CINZEL, fontWeight: 600, fontSize: 15, color: tier(l.rating).color }}>{l.rating}</span>
-                        <span
-                          style={{
-                            fontFamily: CINZEL,
-                            fontSize: 10,
-                            letterSpacing: '.14em',
-                            textTransform: 'uppercase',
-                            color: tier(l.rating).color,
-                            width: 68,
-                            textAlign: 'right',
-                          }}
-                        >
-                          {tier(l.rating).label}
-                        </span>
-                      </>
-                    ) : (
-                      <span style={{ fontSize: 11, fontStyle: 'italic', color: TEXT_MUTED }}>no style set</span>
-                    )}
-                  </div>
-                ))}
-
-                {selected.attributes && (
-                  <>
-                    <div style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.24em', color: TEXT_FAINT, textTransform: 'uppercase', margin: '20px 0 10px' }}>
-                      All {ALL_ATTRIBUTE_KEYS.length} attributes
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))', gap: '4px 18px' }}>
-                      {ALL_ATTRIBUTE_KEYS.map((key) => (
-                        <div
-                          key={key}
-                          style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline', padding: '4px 0', borderBottom: `1px solid ${BORDER_ROW}` }}
-                        >
-                          <span style={{ fontSize: 15, color: TEXT_MUTED }}>{ATTRIBUTE_LABELS[key]}</span>
-                          <span style={{ fontFamily: CINZEL, fontSize: 13, color: tier(selected.attributes[key]).color }}>{selected.attributes[key]}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                <button
-                  onClick={() => setSheetOpen(false)}
-                  style={{
-                    marginTop: 16,
-                    width: '100%',
-                    border: `1px solid ${BORDER_SOFT}`,
-                    background: 'transparent',
-                    color: '#8a8070',
-                    fontFamily: CINZEL,
-                    fontWeight: 600,
-                    fontSize: 11,
-                    letterSpacing: '.16em',
-                    textTransform: 'uppercase',
-                    padding: '12px 15px',
-                    minHeight: 44,
-                    cursor: 'pointer',
-                    borderRadius: 0,
-                  }}
-                >
-                  Close
-                </button>
               </motion.div>
             </div>
           )}
