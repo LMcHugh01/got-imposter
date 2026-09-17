@@ -46,19 +46,19 @@ export const CHAMPION_STYLE_WEIGHTS = {
     willpower: 0.1,
   },
   swift: {
-    technique: 0.4,
+    technique: 0.45,
     speed: 0.25,
     stealth: 0.25,
-    willpower: 0.05,
-    strength: 0.025,
+    willpower: 0.025,
     endurance: 0.025,
   },
   versatile: {
-    technique: 0.6,
+    technique: 0.5,
     speed: 0.1,
     stealth: 0.1,
     strength: 0.1,
     willpower: 0.1,
+    endurance:0.1,
   },
   basic: {
     technique: 0.3,

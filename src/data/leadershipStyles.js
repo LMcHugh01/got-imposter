@@ -55,13 +55,14 @@ export const LEADERSHIP_STYLE_WEIGHTS = {
     // consequence. (Cersei, late-series Tywin-as-power-behind-throne.)
     tyrant: {
       command: 0.25,
-      intimidation: 0.2,
+      intimidation: 0.3,
       subterfuge: 0.15,
       selfPreservation: 0.1,
       prestige: 0.1,
       willpower: 0.1,
       duty: 0.05,
       recruitment: 0.05,
+      justice: -0.1,
     },
     // Makes people want to follow — the new Charisma attribute is the
     // backbone here, alongside battle morale and prestige.
@@ -71,18 +72,18 @@ export const LEADERSHIP_STYLE_WEIGHTS = {
       battleMorale: 0.15,
       prestige: 0.15,
       diplomacy: 0.1,
-      family: 0.1,
+      recruitment: 0.1,
       willpower: 0.1,
     },
     // The "traditional good king" — closest to the original base King
     // formula, since that was written with this archetype in mind.
     // (Ned Stark, Robb.)
     honorable: {
+      command: 0.15,
       honour: 0.2,
       duty: 0.2,
-      command: 0.15,
       justice: 0.15,
-      family: 0.15,
+      diplomacy: 0.15,
       scholarship: 0.1,
       willpower: 0.05,
     },

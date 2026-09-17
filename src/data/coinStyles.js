@@ -45,11 +45,12 @@ export const COIN_STYLE_WEIGHTS = {
   // Grows personal power through the position — treasury health is
   // secondary. (Littlefinger.)
   opportunist: {
-    cunning: 0.35,
-    subterfuge: 0.3,
-    economy: 0.2,
-    selfPreservation: 0.15,
+    cunning: 0.1,
+    subterfuge: 0.1,
+    selfPreservation: 0.1,
+    economy: 0.4,
+    scholarship: 0.1,
     diplomacy: 0.1,
-    honour: -0.1,
+    ambition: 0.1,
   },
 }
