@@ -7,16 +7,17 @@
  * state object, so it's safe to use directly as React state later.
  *
  * A "character" here is expected to look like:
- *   { id, name, house, attributes: {23 stats}, fightingStyle }
+ *   { id, name, house, attributes: {26 stats}, fightingStyle,
+ *     leadershipStyle, commandStyle, coinStyle }
  * i.e. the joined shape of a characters + character_attributes row. Where
  * that join happens (characterAttributesService.js) is outside this file's
- * concern — this engine only cares about the shape above. fightingStyle
- * is only meaningful for Champion (see ratings.js) — every other role
- * ignores it.
+ * concern — this engine only cares about the shape above. Each style
+ * field is only meaningful for its own role(s) (see gameEngine/ratings.js
+ * ROLE_STYLE_KEY) — a role that doesn't need a style ignores all of them.
  */
 
 import { ROLES } from '../data/roleWeights'
-import { roleRating } from './ratings'
+import { roleRating, isRoleRatable } from './ratings'
 
 const OFFER_SIZE = 5
 
@@ -84,21 +85,24 @@ export function offerCharacters(state, rng = Math.random) {
 
 /**
  * Step B (§5.2) — once a character is picked, their fit % against every
- * still-open role, sorted best-first to help the player choose. If
- * Champion is open but the character has no fightingStyle yet (shouldn't
- * happen once the full roster is tagged, but defensively), its fit shows
- * as null rather than crashing the pick screen.
+ * still-open role, sorted best-first to help the player choose. If an
+ * open role needs a style the character hasn't been tagged for yet
+ * (Champion needing fightingStyle, King/Hand/Consort needing
+ * leadershipStyle, Commander needing commandStyle, Master of Coin
+ * needing coinStyle), its fit shows as null rather than crashing the
+ * pick screen — isRoleRatable() is the single source of truth for which
+ * roles need what (see gameEngine/ratings.js).
  */
 export function getRoleOptionsForCharacter(state, character) {
   return getOpenRoles(state)
     .map((role) => {
-      if (role.id === 'champion' && !character.fightingStyle) {
+      if (!isRoleRatable(role.id, character)) {
         return { roleId: role.id, label: role.label, fit: null }
       }
       return {
         roleId: role.id,
         label: role.label,
-        fit: roleRating(character.attributes, role.id, character.fightingStyle),
+        fit: roleRating(character.attributes, role.id, character),
       }
     })
     .sort((a, b) => (b.fit ?? -1) - (a.fit ?? -1))
@@ -107,9 +111,11 @@ export function getRoleOptionsForCharacter(state, character) {
 /**
  * Locks a character into a role, advances the round. Returns a new state;
  * does not mutate the one passed in. Deliberately strict here (unlike the
- * Step B preview above) — actually assigning an untagged character to
- * Champion throws, since that's a real data gap that should surface
- * immediately rather than lock in a wrong/missing rating.
+ * Step B preview above) — actually assigning an untagged character to a
+ * style-driven role throws, since that's a real data gap that should
+ * surface immediately rather than lock in a wrong/missing rating. (This
+ * falls straight out of roleRating() itself being strict — no extra guard
+ * needed here.)
  */
 export function assignRole(state, character, roleId) {
   if (state.draftedCharacterIds.has(character.id)) {
@@ -122,7 +128,7 @@ export function assignRole(state, character, roleId) {
     throw new Error(`Role "${roleId}" is already filled.`)
   }
 
-  const fit = roleRating(character.attributes, roleId, character.fightingStyle)
+  const fit = roleRating(character.attributes, roleId, character)
 
   return {
     ...state,

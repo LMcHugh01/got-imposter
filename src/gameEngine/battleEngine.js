@@ -37,7 +37,7 @@
  * modifier, see tickBattle.
  */
 
-import { effectiveAttribute, roleRating } from './ratings'
+import { effectiveAttribute, roleRating, isRoleRatable } from './ratings'
 import { statToModifier } from './modifiers'
 
 // --- tunable constants -----------------------------------------------
@@ -888,7 +888,15 @@ export function extractCouncilBattleInputs(roster) {
 
   const ratingOrZero = (roleId) => {
     const character = byRole[roleId]
-    return character ? roleRating(character.attributes, roleId, character.fightingStyle) : 0
+    // Pass the whole character, not just fightingStyle — King needs
+    // leadershipStyle and Commander needs commandStyle here, neither of
+    // which is fightingStyle. roleRating() only reads whichever field
+    // the role actually needs (see ROLE_STYLE_KEY in gameEngine/ratings.js).
+    // isRoleRatable() guard: a filled seat whose character hasn't been
+    // tagged with the style that role needs yet contributes 0, same as
+    // an empty seat, rather than throwing mid-battle.
+    if (!character || !isRoleRatable(roleId, character)) return 0
+    return roleRating(character.attributes, roleId, character)
   }
 
   const leadership = ratingOrZero('king')
@@ -928,7 +936,13 @@ export function extractCouncilEconomyInputs(roster) {
 
   const effectiveOrZero = (roleId, attr) => {
     const character = byRole[roleId]
-    return character ? effectiveAttribute(character.attributes, roleId, attr) : 0
+    // masterOfCoin needs coinStyle, king/hand/consort need leadershipStyle
+    // — passing the whole character lets effectiveAttribute() pull
+    // whichever field the role actually needs. Same isRoleRatable()
+    // guard as ratingOrZero above — an untagged seat contributes 0
+    // rather than throwing mid-battle.
+    if (!character || !isRoleRatable(roleId, character)) return 0
+    return effectiveAttribute(character.attributes, roleId, attr, character)
   }
 
   return {

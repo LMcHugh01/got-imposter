@@ -1,7 +1,20 @@
-import { roleRating } from '../../../../gameEngine/ratings'
+import { roleRating, isRoleRatable, ROLE_STYLE_KEY, STYLE_MISSING_REASON } from '../../../../gameEngine/ratings'
 import { STAT_CONTRIBUTORS, STAT_LABELS, ratingLabel } from '../../../../gameEngine/houseStats'
 import { ATTRIBUTE_LABELS } from '../../../../data/attributes'
 import { CHAMPION_STYLE_LABELS } from '../../../../data/championStyles'
+import { LEADERSHIP_STYLE_LABELS } from '../../../../data/leadershipStyles'
+import { COMMAND_STYLE_LABELS } from '../../../../data/commandStyles'
+import { COIN_STYLE_LABELS } from '../../../../data/coinStyles'
+
+// Which label map to read a character's assigned style from, per style
+// field — lets the "sub-label under the name" row below stay generic
+// instead of one more hardcoded champion-only check.
+const STYLE_LABELS_FOR_KEY = {
+  fightingStyle: CHAMPION_STYLE_LABELS,
+  leadershipStyle: LEADERSHIP_STYLE_LABELS,
+  commandStyle: COMMAND_STYLE_LABELS,
+  coinStyle: COIN_STYLE_LABELS,
+}
 
 /**
  * pages/games/draft/HouseStatModal.jsx
@@ -35,11 +48,12 @@ export default function HouseStatModal({ statId, value, roster, onClose }) {
       continue
     }
     const { role, character } = entry
-    if (roleId === 'champion' && !character.fightingStyle) {
-      excluded.push({ roleId, role, character, reason: 'No fighting style set' })
+    if (!isRoleRatable(roleId, character)) {
+      const styleKey = ROLE_STYLE_KEY[roleId]
+      excluded.push({ roleId, role, character, reason: STYLE_MISSING_REASON[styleKey] })
       continue
     }
-    const fit = roleRating(character.attributes, roleId, character.fightingStyle)
+    const fit = roleRating(character.attributes, roleId, character)
     const rawValue = character.attributes[attr]
     const effective = rawValue * (fit / 100)
 
@@ -92,11 +106,16 @@ export default function HouseStatModal({ statId, value, roster, onClose }) {
                   <p className="text-got-parchment text-base truncate" style={{ fontFamily: 'Cinzel, serif' }}>
                     {character.name}
                   </p>
-                  {role.id === 'champion' && character.fightingStyle && (
-                    <p className="text-stone-600 text-xs italic mt-0.5">
-                      {CHAMPION_STYLE_LABELS[character.fightingStyle]}
-                    </p>
-                  )}
+                  {(() => {
+                    const styleKey = ROLE_STYLE_KEY[role.id]
+                    const styleValue = styleKey && character[styleKey]
+                    if (!styleValue) return null
+                    return (
+                      <p className="text-stone-600 text-xs italic mt-0.5">
+                        {STYLE_LABELS_FOR_KEY[styleKey][styleValue]}
+                      </p>
+                    )
+                  })()}
                 </div>
                 <span className="text-got-gold/70 text-xs shrink-0" style={{ fontFamily: 'Cinzel, serif' }}>
                   {fit}% fit

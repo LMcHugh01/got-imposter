@@ -2,24 +2,51 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import PageWrapper from '../../components/PageWrapper'
 import { fetchAllCharactersForBrowse } from '../../lib/characterAttributesService'
-import { allRoleRatings, bestFitRoles } from '../../gameEngine/ratings'
-import { ROLES, ROLE_WEIGHTS } from '../../data/roleWeights'
-import { CHAMPION_STYLES, CHAMPION_STYLE_LABELS, CHAMPION_STYLE_WEIGHTS } from '../../data/championStyles'
-import {
-  ATTRIBUTE_CATEGORIES,
-  ATTRIBUTE_LABELS,
-  ATTRIBUTE_SHORT_LABELS,
-  ALL_ATTRIBUTE_KEYS,
-} from '../../data/attributes'
+import { allRoleRatings, weightsFor } from '../../gameEngine/ratings'
+import { ROLES } from '../../data/roleWeights'
+import { CHAMPION_STYLES, CHAMPION_STYLE_LABELS } from '../../data/championStyles'
+import { LEADERSHIP_STYLES, LEADERSHIP_STYLE_LABELS } from '../../data/leadershipStyles'
+import { COMMAND_STYLES, COMMAND_STYLE_LABELS } from '../../data/commandStyles'
+import { COIN_STYLES, COIN_STYLE_LABELS } from '../../data/coinStyles'
+import { ATTRIBUTE_CATEGORIES, ATTRIBUTE_LABELS, ATTRIBUTE_SHORT_LABELS, ALL_ATTRIBUTE_KEYS } from '../../data/attributes'
 
-const ALL_ROLE_IDS = ROLES.map((r) => r.id)
+/* ------------------------------------------------------------------ *
+ * Palette — lifted directly from the "Archive" redesign mockup.
+ * ------------------------------------------------------------------ */
+const BG = '#070606'
+const PANEL_1 = '#17130e'
+const PANEL_2 = '#0c0a09'
+const INPUT_BG = '#0c0a08'
+const SHEET_TOP = '#15110d'
+const SHEET_BOTTOM = '#0b0a09'
+
+const GOLD = '#c9a75a'
+const GOLD_SOFT = '#d9b871'
+const CHIP_GOLD = '#e8cf96'
+const TEXT_BRIGHT = '#f5efe1'
+const TEXT_BODY = '#efe7d7'
+const TEXT_MUTED = '#9a8f78'
+const TEXT_FAINT = '#a09170'
+const TEXT_LABEL = '#c0ae84'
+
+const BORDER = '#3a3122'
+const BORDER_SOFT = '#2b2419'
+const BORDER_FAINT = '#1d1811'
+const BORDER_HAIR = '#241e15'
+const BORDER_ROW = '#16130e'
+const BORDER_GRID = '#33291c'
+const TRACK = '#1a1610'
+const ACCENT = '#8c6a3c'
+
+const CINZEL = "'Cinzel', serif"
+const GARAMOND = "'EB Garamond', Georgia, serif"
+
+/* ------------------------------------------------------------------ *
+ * Data helpers
+ * ------------------------------------------------------------------ */
 const ROLE_LABEL = Object.fromEntries(ROLES.map((r) => [r.id, r.label]))
-const CATEGORY_IDS = ATTRIBUTE_CATEGORIES.map((c) => c.id)
 
-// Short codes for the category-average columns (mirrors the pattern
-// already used for ROLE_SHORT_LABEL / ATTRIBUTE_SHORT_LABELS below) —
-// needed because these columns are now only ~56px wide.
-const CATEGORY_SHORT_LABEL = {
+const CATEGORY_CODE = {
   combat: 'CMB',
   wits: 'WIT',
   statecraft: 'STA',
@@ -28,60 +55,29 @@ const CATEGORY_SHORT_LABEL = {
   presence: 'PRE',
 }
 
-const CATEGORY_COLUMNS = ATTRIBUTE_CATEGORIES.map((cat) => ({
-  key: cat.id,
-  label: CATEGORY_SHORT_LABEL[cat.id] ?? cat.id.toUpperCase(),
-  fullLabel: cat.label,
+const CATEGORIES = ATTRIBUTE_CATEGORIES.map((cat) => ({
+  id: cat.id,
+  label: cat.label,
+  code: CATEGORY_CODE[cat.id] ?? cat.id.slice(0, 3).toUpperCase(),
+  keys: cat.attributes,
 }))
 
-// Flattened attribute columns, in category order — still used by the
-// (unabridged) coefficients reference table.
-const ATTRIBUTE_COLUMNS = ATTRIBUTE_CATEGORIES.flatMap((cat) =>
-  cat.attributes.map((key, i) => ({
-    key,
-    label: ATTRIBUTE_SHORT_LABELS[key],
-    fullLabel: ATTRIBUTE_LABELS[key],
-    categoryId: cat.id,
-    categoryLabel: cat.label,
-    isFirstInCategory: i === 0,
-  }))
-)
+// The 4 independent style categories a character can be tagged with —
+// fightingStyle (Champion), leadershipStyle (King/Hand/Consort),
+// commandStyle (Commander), coinStyle (Master of Coin). Each option in
+// the style filter dropdown is one of these grouped by category, so
+// filtering by e.g. "Tactician" only matches on commandStyle, never
+// collides with a same-named value in another category. `key` is the
+// character field each one reads.
+const STYLE_GROUPS = [
+  { key: 'fightingStyle', label: 'Fighting Style', options: CHAMPION_STYLES, labels: CHAMPION_STYLE_LABELS },
+  { key: 'leadershipStyle', label: 'Leadership Style', options: LEADERSHIP_STYLES, labels: LEADERSHIP_STYLE_LABELS },
+  { key: 'commandStyle', label: 'Command Style', options: COMMAND_STYLES, labels: COMMAND_STYLE_LABELS },
+  { key: 'coinStyle', label: 'Coin Style', options: COIN_STYLES, labels: COIN_STYLE_LABELS },
+]
+const STYLE_GROUP_BY_KEY = Object.fromEntries(STYLE_GROUPS.map((g) => [g.key, g]))
 
-// Fixed pixel widths for every column of the main table. table-layout is
-// `fixed` and driven by a <colgroup> using exactly these values, so the
-// sticky left-offsets for the first three (frozen) columns below are
-// always accurate regardless of content or viewport width.
-const NAME_COL_W = 128
-const ROLE_COL_W = 52
-const STYLE_COL_W = 80
-const CATEGORY_COL_W = 56
-const ATTRIBUTE_COL_W = 92
-const TABLE_W = NAME_COL_W + ROLE_COL_W + STYLE_COL_W + CATEGORY_COL_W * CATEGORY_COLUMNS.length + ATTRIBUTE_COL_W
-
-// Left offset for the one frozen ("sticky") column — Name+House — so it
-// stays visible while the rest of the table (including Role and Style)
-// scrolls horizontally on narrow/mobile screens.
-const STICKY_LEFT = {
-  name: 0,
-}
-
-// Display-only tiering (Pillar 4: numbers need context). Not part of the
-// engine — purely for coloring/labeling this page.
-function tierLabel(value) {
-  if (value >= 80) return 'Excellent'
-  if (value >= 65) return 'Strong'
-  if (value >= 50) return 'Solid'
-  if (value >= 35) return 'Weak'
-  return 'Poor'
-}
-
-function tierColor(value) {
-  if (value >= 80) return 'text-got-gold'
-  if (value >= 65) return 'text-got-parchment'
-  if (value >= 50) return 'text-got-parchment/70'
-  if (value >= 35) return 'text-stone-500'
-  return 'text-got-red-bright/80'
-}
+const GRID_COLS = `minmax(196px,1.7fr) 74px repeat(${CATEGORIES.length},minmax(50px,.62fr)) 128px`
 
 function average(values) {
   const nums = values.filter((v) => typeof v === 'number')
@@ -89,348 +85,147 @@ function average(values) {
   return Math.round(nums.reduce((a, b) => a + b, 0) / nums.length)
 }
 
-// The Role column shows either "Best Fit" (whichever role rates highest)
-// or the rating for one specific role, depending on the Role filter.
-function roleColumnValue(c, roleFilter) {
-  if (roleFilter === 'bestFit') return c.bestFit?.rating ?? null
-  return c.roleFits?.[roleFilter] ?? null
+function initials(name) {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return '?'
+  const first = parts[0][0]
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : ''
+  return (first + last).toUpperCase()
 }
 
-function roleColumnDisplay(c, roleFilter) {
-  if (roleFilter === 'bestFit') {
-    if (!c.bestFit) return null
-    return { rating: c.bestFit.rating, roleId: c.bestFit.roleId }
-  }
-  const rating = c.roleFits?.[roleFilter]
-  return rating != null ? { rating, roleId: roleFilter } : null
+// Display-only tiering — colors/labels a rating, doesn't touch the engine.
+function tier(v) {
+  if (v == null) return { label: '—', color: TEXT_MUTED }
+  if (v >= 85) return { label: 'Excellent', color: GOLD_SOFT }
+  if (v >= 70) return { label: 'Strong', color: TEXT_BODY }
+  if (v >= 55) return { label: 'Solid', color: '#c5b89f' }
+  if (v >= 40) return { label: 'Weak', color: '#b09a7e' }
+  return { label: 'Poor', color: '#c08d80' }
 }
 
-// The Attribute column only shows a value once the user picks an
-// attribute in the filter; otherwise it's blank.
-function attributeColumnValue(c, attributeFilter) {
-  if (!attributeFilter) return null
-  return c.attributes?.[attributeFilter] ?? null
+function barColor(v, keyed) {
+  if (keyed) return 'linear-gradient(90deg,#8a6f34,#d9b871)'
+  return (v ?? 0) >= 70 ? '#8d7a4e' : '#4f462f'
 }
 
-// A role's coefficient table — Champion is keyed by fighting style
-// instead of ROLE_WEIGHTS, same special-case as gameEngine/ratings.js.
-function coefficientsForRole(roleId, fightingStyle) {
-  if (!roleId) return null
-  if (roleId === 'champion') {
-    return fightingStyle ? CHAMPION_STYLE_WEIGHTS[fightingStyle] : null
-  }
-  return ROLE_WEIGHTS[roleId] ?? null
+// A role's coefficient table, for any role — style-driven (Champion,
+// King, Hand, Consort, Commander, Master of Coin) or flat. Reads straight
+// off gameEngine/ratings.js's own weightsFor(), the exact same lookup
+// roleRating() uses internally, so this can never drift out of sync with
+// which roles are style-driven. `character` just needs to be the whole
+// character object — weightsFor() reads whichever of fightingStyle/
+// leadershipStyle/commandStyle/coinStyle the role actually needs and
+// ignores the rest.
+function coefficientsForRole(roleId, character) {
+  if (!roleId || !character) return null
+  return weightsFor(roleId, character)
 }
 
-function SortHeader({ label, sortKey, activeKey, direction, onSort, align = 'left', title, dividerLeft, sticky, leftOffset }) {
-  const isActive = activeKey === sortKey
+/* ------------------------------------------------------------------ *
+ * Small building blocks
+ * ------------------------------------------------------------------ */
+function SectionLabel({ children, right }) {
   return (
-    <th
-      title={title}
-      className={[
-        'py-2 px-2 whitespace-nowrap select-none cursor-pointer transition-colors overflow-hidden',
-        align === 'right' ? 'text-right' : 'text-left',
-        isActive ? 'text-got-gold' : 'text-stone-500 hover:text-stone-300',
-        dividerLeft ? 'border-l border-stone-700' : '',
-        sticky ? 'sticky z-20 bg-stone-900' : '',
-      ].join(' ')}
-      style={{ fontFamily: 'Cinzel, serif', fontSize: '0.7rem', letterSpacing: '0.08em', ...(sticky ? { left: leftOffset } : {}) }}
-      onClick={() => onSort(sortKey)}
-    >
-      <span className="truncate block">
-        {label}
-        {isActive && <span className="ml-1">{direction === 'asc' ? '▲' : '▼'}</span>}
-      </span>
-    </th>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 14 }}>
+      <div style={{ width: 8, height: 8, flex: 'none', border: `1px solid ${ACCENT}`, transform: 'rotate(45deg)' }} />
+      <div style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.26em', color: TEXT_LABEL, textTransform: 'uppercase' }}>
+        {children}
+      </div>
+      <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${BORDER}, transparent)` }} />
+      {right}
+    </div>
   )
 }
 
-function AttributeBar({ label, value, highlighted, dimmed, weight }) {
+function Chip({ gold, children }) {
   return (
     <div
-      className={[
-        'flex items-center gap-3 rounded transition-all',
-        highlighted ? '-mx-2 px-2 py-0.5 bg-got-gold/10 ring-1 ring-got-gold/40' : '',
-        dimmed ? 'opacity-30' : '',
-      ].join(' ')}
+      style={{
+        fontFamily: CINZEL,
+        fontSize: 11,
+        letterSpacing: '.14em',
+        textTransform: 'uppercase',
+        padding: '6px 10px',
+        border: `1px solid ${gold ? ACCENT : BORDER_SOFT}`,
+        background: gold ? 'rgba(201,167,90,.12)' : PANEL_2,
+        color: gold ? CHIP_GOLD : TEXT_MUTED,
+      }}
     >
-      <span
-        className={['w-28 text-xs shrink-0', highlighted ? 'text-got-gold' : 'text-got-parchment/60'].join(' ')}
-        style={{ fontFamily: 'Cinzel, serif', letterSpacing: '0.05em' }}
-      >
-        {label}
-      </span>
-      <div className="flex-1 h-2 rounded-full bg-stone-800 overflow-hidden">
-        <div
-          className={['h-full rounded-full', highlighted ? 'bg-got-gold' : 'bg-got-gold/70'].join(' ')}
-          style={{ width: `${Math.max(0, Math.min(100, value ?? 0))}%` }}
-        />
-      </div>
-      <span
-        className={['w-8 text-right text-sm', highlighted ? 'text-got-gold' : 'text-got-parchment'].join(' ')}
-        style={{ fontFamily: 'Cinzel, serif' }}
-      >
-        {value ?? '—'}
-      </span>
-      {weight != null && (
-        <span
-          className="w-10 text-right text-[0.65rem] text-got-gold/70"
-          style={{ fontFamily: 'Cinzel, serif' }}
-          title="Weight this attribute carries toward the highlighted role"
-        >
-          ×{weight.toFixed(2)}
-        </span>
-      )}
+      {children}
     </div>
   )
 }
 
-function CharacterHero({ character }) {
-  const [highlightedRoleId, setHighlightedRoleId] = useState(null)
-
-  if (!character) {
-    return (
-      <div className="w-full rounded-lg border border-stone-800 bg-stone-900/40 p-8 flex flex-col items-center gap-3 text-center">
-        <span className="text-4xl select-none">📜</span>
-        <p className="text-got-parchment/40 text-base italic" style={{ fontFamily: 'EB Garamond, serif' }}>
-          Select a character from the table to see their full attribute and role-fit breakdown.
-        </p>
-      </div>
-    )
-  }
-
-  const attributes = character.attributes
-  const style = character.fightingStyle
-  const ratingsByRole = attributes ? allRoleRatings(attributes, style) : null
-  const roleRatingsList = ratingsByRole
-    ? ROLES.map((r) => ({ id: r.id, label: r.label, rating: ratingsByRole[r.id] })).sort(
-        (a, b) => (b.rating ?? -1) - (a.rating ?? -1)
-      )
-    : []
-  const best = attributes ? bestFitRoles(attributes, ALL_ROLE_IDS, 1, style)[0] : null
-
-  const highlightedWeights = highlightedRoleId ? coefficientsForRole(highlightedRoleId, style) : null
-
-  const handleRoleClick = (roleId, rating) => {
-    if (rating == null) return // e.g. Champion with no fighting style set — nothing to highlight
-    setHighlightedRoleId((current) => (current === roleId ? null : roleId))
-  }
-
+function GhostButton({ onClick, small, children }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="w-full rounded-lg border border-got-gold/30 bg-stone-900/60 p-6 flex flex-col md:flex-row gap-6"
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        border: `1px solid ${BORDER}`,
+        background: 'transparent',
+        color: '#c4b696',
+        fontFamily: CINZEL,
+        fontWeight: 600,
+        fontSize: small ? 10 : 11,
+        letterSpacing: '.16em',
+        textTransform: 'uppercase',
+        padding: small ? '8px 11px' : '12px 15px',
+        minHeight: small ? 36 : 44,
+        cursor: 'pointer',
+        borderRadius: 0,
+        flex: 'none',
+      }}
     >
-      {/* Identity */}
-      <div className="flex flex-row md:flex-col items-center md:items-start gap-4 md:w-48 shrink-0">
-        {character.image_url ? (
-          <img
-            src={character.image_url}
-            alt={character.name}
-            className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-2 border-got-gold/40"
-          />
-        ) : (
-          <div
-            className="w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center border-2 border-got-gold/20"
-            style={{ background: 'rgba(201,168,76,0.06)' }}
-          >
-            <span className="text-3xl">⚔️</span>
-          </div>
-        )}
-        <div>
-          <h3 className="text-xl font-bold text-got-gold leading-tight" style={{ fontFamily: 'Cinzel, serif' }}>
-            {character.name}
-          </h3>
-          {character.house && (
-            <p className="text-sm text-got-parchment/50 italic mt-1" style={{ fontFamily: 'EB Garamond, serif' }}>
-              House {character.house}
-            </p>
-          )}
-          {style ? (
-            <p className="text-xs text-got-parchment/40 mt-1" style={{ fontFamily: 'Cinzel, serif', letterSpacing: '0.05em' }}>
-              Style: <span className="text-got-parchment/70">{CHAMPION_STYLE_LABELS[style]}</span>
-            </p>
-          ) : (
-            <p className="text-xs text-got-red-bright/50 mt-1 italic" style={{ fontFamily: 'EB Garamond, serif' }}>
-              No fighting style set
-            </p>
-          )}
-          {best && (
-            <p className="text-xs text-got-parchment/40 mt-2" style={{ fontFamily: 'Cinzel, serif', letterSpacing: '0.05em' }}>
-              Best fit:{' '}
-              <span className="text-got-gold">
-                {ROLE_LABEL[best.roleId]} {best.rating}
-              </span>
-            </p>
-          )}
-        </div>
-      </div>
-
-      {!attributes ? (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-got-red-bright/70 text-sm italic text-center" style={{ fontFamily: 'EB Garamond, serif' }}>
-            No attributes have been entered for this character yet.
-          </p>
-        </div>
-      ) : (
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Attributes, grouped by category */}
-          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-            {ATTRIBUTE_CATEGORIES.map((cat) => (
-              <div key={cat.id} className="flex flex-col gap-1.5">
-                <p
-                  className="text-got-gold/70 text-xs tracking-widest uppercase mb-0.5"
-                  style={{ fontFamily: 'Cinzel, serif' }}
-                >
-                  {cat.label}
-                </p>
-                {cat.attributes.map((key) => {
-                  const weight = highlightedWeights ? highlightedWeights[key] : undefined
-                  const isHighlighted = Boolean(highlightedWeights) && weight !== undefined
-                  const isDimmed = Boolean(highlightedWeights) && weight === undefined
-                  return (
-                    <AttributeBar
-                      key={key}
-                      label={ATTRIBUTE_LABELS[key]}
-                      value={attributes[key]}
-                      highlighted={isHighlighted}
-                      dimmed={isDimmed}
-                      weight={isHighlighted ? weight : null}
-                    />
-                  )
-                })}
-              </div>
-            ))}
-          </div>
-
-          {/* Role list — click a role to highlight the attributes that feed its score */}
-          <div className="flex flex-col gap-1.5">
-            <p className="text-got-gold/70 text-xs tracking-widest uppercase mb-1" style={{ fontFamily: 'Cinzel, serif' }}>
-              Role
-            </p>
-            {highlightedRoleId && (
-              <p className="text-got-parchment/40 text-xs italic -mt-1 mb-0.5" style={{ fontFamily: 'EB Garamond, serif' }}>
-                Highlighting {ROLE_LABEL[highlightedRoleId]}'s key attributes
-              </p>
-            )}
-            {roleRatingsList.map((r, i) => {
-              const isTop = i === 0
-              const isSelected = highlightedRoleId === r.id
-              const clickable = r.rating != null
-              return (
-                <button
-                  key={r.id}
-                  type="button"
-                  disabled={!clickable}
-                  onClick={() => handleRoleClick(r.id, r.rating)}
-                  className={[
-                    'flex items-center justify-between text-sm text-left rounded px-2 py-1 -mx-2 transition-colors',
-                    clickable ? 'cursor-pointer' : 'cursor-default',
-                    isSelected ? 'bg-got-gold/10 ring-1 ring-got-gold/40' : clickable ? 'hover:bg-stone-800/60' : '',
-                  ].join(' ')}
-                >
-                  <span
-                    className={isSelected || isTop ? 'text-got-gold' : 'text-got-parchment/70'}
-                    style={{ fontFamily: 'EB Garamond, serif' }}
-                  >
-                    {r.label}
-                  </span>
-                  {r.rating != null ? (
-                    <span className={tierColor(r.rating)} style={{ fontFamily: 'Cinzel, serif' }}>
-                      {r.rating} <span className="text-xs opacity-60">{tierLabel(r.rating)}</span>
-                    </span>
-                  ) : (
-                    <span className="text-stone-700 text-xs italic">no style set</span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-    </motion.div>
+      {children}
+    </button>
   )
 }
 
-function CoefficientsTable() {
+function GoldButton({ onClick, children }) {
   return (
-    <div className="w-full overflow-x-auto rounded-lg border border-stone-800">
-      <table className="w-full border-collapse min-w-[1400px]">
-        <thead>
-          <tr className="border-b border-stone-800 bg-stone-900/60">
-            <th
-              className="py-3 px-3 text-left whitespace-nowrap text-stone-500 sticky left-0 z-10 bg-stone-900"
-              style={{ fontFamily: 'Cinzel, serif', fontSize: '0.7rem', letterSpacing: '0.08em' }}
-            >
-              ROLE
-            </th>
-            {ATTRIBUTE_COLUMNS.map((col) => (
-              <th
-                key={col.key}
-                title={col.fullLabel}
-                className={[
-                  'py-3 px-3 text-right whitespace-nowrap text-stone-500',
-                  col.isFirstInCategory ? 'border-l border-stone-700' : '',
-                ].join(' ')}
-                style={{ fontFamily: 'Cinzel, serif', fontSize: '0.7rem', letterSpacing: '0.08em' }}
-              >
-                {col.label}
-              </th>
-            ))}
-            <th
-              className="py-3 px-3 text-right whitespace-nowrap text-got-gold/70 border-l border-stone-700"
-              style={{ fontFamily: 'Cinzel, serif', fontSize: '0.7rem', letterSpacing: '0.08em' }}
-            >
-              TOTAL
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {ROLES.map((role) => {
-            const weights = ROLE_WEIGHTS[role.id] ?? {}
-            const total = Object.values(weights).reduce((a, b) => a + b, 0)
-            return (
-              <tr key={role.id} className="border-b border-stone-900">
-                <td
-                  className="py-2.5 px-3 whitespace-nowrap text-got-parchment sticky left-0 z-10 bg-got-black"
-                  style={{ fontFamily: 'Cinzel, serif' }}
-                >
-                  {role.label}
-                </td>
-                {ATTRIBUTE_COLUMNS.map((col) => {
-                  const weight = weights[col.key]
-                  const hasWeight = weight !== undefined
-                  const isNegative = hasWeight && weight < 0
-                  return (
-                    <td
-                      key={col.key}
-                      className={[
-                        'py-2.5 px-3 text-right text-sm',
-                        !hasWeight ? 'text-stone-800' : isNegative ? 'text-got-red-bright/90 font-bold' : 'text-got-parchment/80',
-                        col.isFirstInCategory ? 'border-l border-stone-900' : '',
-                      ].join(' ')}
-                      style={{ fontFamily: 'Cinzel, serif' }}
-                    >
-                      {hasWeight ? weight.toFixed(2) : '—'}
-                    </td>
-                  )
-                })}
-                <td
-                  className="py-2.5 px-3 text-right text-sm text-got-gold/80 border-l border-stone-900"
-                  style={{ fontFamily: 'Cinzel, serif' }}
-                >
-                  {total.toFixed(2)}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        border: `1px solid ${GOLD}`,
+        background: 'linear-gradient(#d3b169,#b3904a)',
+        color: '#17120b',
+        fontFamily: CINZEL,
+        fontWeight: 600,
+        fontSize: 11,
+        letterSpacing: '.16em',
+        textTransform: 'uppercase',
+        padding: '12px 15px',
+        minHeight: 44,
+        cursor: 'pointer',
+        borderRadius: 0,
+        flex: 'none',
+      }}
+    >
+      {children}
+    </button>
   )
 }
+
+const selectStyle = {
+  flex: '1 1 175px',
+  minWidth: 0,
+  background: INPUT_BG,
+  border: `1px solid ${BORDER_SOFT}`,
+  color: '#d6cbb4',
+  fontSize: '.72rem',
+  letterSpacing: '.14em',
+  textTransform: 'uppercase',
+  padding: '12px 11px',
+  minHeight: 46,
+  outline: 'none',
+  borderRadius: 0,
+  cursor: 'pointer',
+  fontFamily: CINZEL,
+}
+
+/* ------------------------------------------------------------------ */
 
 export default function Characters() {
   const [characters, setCharacters] = useState([])
@@ -438,33 +233,15 @@ export default function Characters() {
   const [error, setError] = useState(null)
 
   const [selectedId, setSelectedId] = useState(null)
-  const [search, setSearch] = useState('')
+  const [query, setQuery] = useState('')
   const [houseFilter, setHouseFilter] = useState('all')
   const [styleFilter, setStyleFilter] = useState('all')
   const [roleFilter, setRoleFilter] = useState('bestFit')
   const [attributeFilter, setAttributeFilter] = useState('')
-  const [sortKey, setSortKey] = useState('name')
-  const [sortDir, setSortDir] = useState('asc')
-  const [showCoefficients, setShowCoefficients] = useState(false)
-
-  // Click-to-reveal popover for the Role column: { rowId, label, x, y } | null.
-  // Positioned with `fixed` (viewport) coordinates captured at click time so
-  // it always renders on top, unclipped by the table's horizontal-scroll
-  // container.
-  const [rolePopover, setRolePopover] = useState(null)
-
-  useEffect(() => {
-    if (!rolePopover) return
-    const close = () => setRolePopover(null)
-    window.addEventListener('scroll', close, true)
-    window.addEventListener('resize', close)
-    document.addEventListener('click', close)
-    return () => {
-      window.removeEventListener('scroll', close, true)
-      window.removeEventListener('resize', close)
-      document.removeEventListener('click', close)
-    }
-  }, [rolePopover])
+  const [sortKey, setSortKey] = useState('fit')
+  const [sortDir, setSortDir] = useState('desc')
+  const [showCoefficients, setShowCoefficients] = useState(true)
+  const [sheetOpen, setSheetOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -487,46 +264,70 @@ export default function Characters() {
     }
   }, [])
 
-  const houses = useMemo(() => {
-    const set = new Set(characters.map((c) => c.house).filter(Boolean))
-    return ['all', ...Array.from(set).sort()]
-  }, [characters])
-
   const rows = useMemo(() => {
     return characters.map((c) => {
-      const roleFits = c.attributes ? allRoleRatings(c.attributes, c.fightingStyle) : null
+      // Pass the whole character, not just fightingStyle — allRoleRatings
+      // needs leadershipStyle for King/Hand/Consort, commandStyle for
+      // Commander, and coinStyle for Master of Coin too. Any role whose
+      // required style isn't set on this character comes back null
+      // (graceful "not yet knowable"), same as it always has for an
+      // untagged Champion.
+      const roleFits = c.attributes ? allRoleRatings(c.attributes, c) : null
+      const ladder = ROLES.map((r) => ({
+        roleId: r.id,
+        label: r.label,
+        rating: roleFits ? roleFits[r.id] ?? null : null,
+      })).sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
+      const best = ladder.find((l) => l.rating != null) ?? null
       const categoryAverages = c.attributes
-        ? Object.fromEntries(
-            ATTRIBUTE_CATEGORIES.map((cat) => [cat.id, average(cat.attributes.map((key) => c.attributes[key]))])
-          )
+        ? Object.fromEntries(CATEGORIES.map((cat) => [cat.id, average(cat.keys.map((k) => c.attributes[k]))]))
         : null
-      return {
-        ...c,
-        roleFits,
-        categoryAverages,
-        bestFit: c.attributes ? bestFitRoles(c.attributes, ALL_ROLE_IDS, 1, c.fightingStyle)[0] : null,
-      }
+      return { ...c, roleFits, ladder, best, categoryAverages }
     })
   }, [characters])
 
+  // The Attribute column only exists while an attribute is chosen — if it's
+  // cleared while the table happens to be sorted by it, fall back to Fit.
+  useEffect(() => {
+    if (!attributeFilter && sortKey === 'attribute') {
+      setSortKey('fit')
+      setSortDir('desc')
+    }
+  }, [attributeFilter, sortKey])
+
+  const houses = useMemo(() => {
+    const set = new Set(characters.map((c) => c.house).filter(Boolean))
+    return Array.from(set).sort()
+  }, [characters])
+
+  const activeRole = roleFilter === 'bestFit' ? null : ROLES.find((r) => r.id === roleFilter) ?? null
+  const activeStyleGroup = styleFilter !== 'all' ? STYLE_GROUP_BY_KEY[styleFilter.split(':')[0]] : STYLE_GROUP_BY_KEY.fightingStyle
+
+  const fitFor = (c) => (activeRole ? c.roleFits?.[activeRole.id] ?? null : c.best?.rating ?? null)
+
   const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
     return rows.filter((c) => {
+      if (q && !(c.name?.toLowerCase().includes(q) || c.house?.toLowerCase().includes(q))) return false
       if (houseFilter !== 'all' && c.house !== houseFilter) return false
-      if (styleFilter !== 'all' && c.fightingStyle !== styleFilter) return false
-      if (search.trim() && !c.name?.toLowerCase().includes(search.trim().toLowerCase())) return false
+      if (styleFilter !== 'all') {
+        const [key, value] = styleFilter.split(':')
+        if (c[key] !== value) return false
+      }
       return true
     })
-  }, [rows, houseFilter, styleFilter, search])
+  }, [rows, query, houseFilter, styleFilter])
 
   const sorted = useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1
+    const category = CATEGORIES.find((cat) => cat.id === sortKey)
 
     const getValue = (c) => {
+      if (sortKey === 'fit') return fitFor(c) ?? -1
       if (sortKey === 'name') return c.name ?? ''
-      if (sortKey === 'style') return c.fightingStyle ? CHAMPION_STYLE_LABELS[c.fightingStyle] : ''
-      if (sortKey === 'role') return roleColumnValue(c, roleFilter) ?? -1
-      if (sortKey === 'attribute') return attributeColumnValue(c, attributeFilter) ?? -1
-      if (CATEGORY_IDS.includes(sortKey)) return c.categoryAverages?.[sortKey] ?? -1
+      if (sortKey === 'style') return activeStyleGroup.options.indexOf(c[activeStyleGroup.key])
+      if (sortKey === 'attribute') return c.attributes?.[attributeFilter] ?? -1
+      if (category) return c.categoryAverages?.[category.id] ?? -1
       return -1
     }
 
@@ -536,370 +337,702 @@ export default function Characters() {
       if (typeof va === 'string') return va.localeCompare(vb) * dir
       return (va - vb) * dir
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, sortKey, sortDir, roleFilter, attributeFilter])
 
   const handleSort = (key) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else {
       setSortKey(key)
       setSortDir(key === 'name' ? 'asc' : 'desc')
     }
   }
 
-  const selectedCharacter = rows.find((c) => c.id === selectedId) ?? null
+  const headerCellStyle = (key, align) => ({
+    fontFamily: CINZEL,
+    fontSize: 10.5,
+    letterSpacing: '.2em',
+    textTransform: 'uppercase',
+    color: sortKey === key ? CHIP_GOLD : TEXT_FAINT,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    textAlign: align || 'left',
+  })
+  const sortArrow = (key) => (sortKey === key ? (sortDir === 'desc' ? ' ↓' : ' ↑') : '')
 
-  const handleRowClick = (c) => {
-    setSelectedId((current) => (current === c.id ? null : c.id))
-  }
-
-  const handleRoleNumberClick = (e, rowId, label) => {
-    e.stopPropagation()
-    if (!label) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    setRolePopover((current) =>
-      current?.rowId === rowId ? null : { rowId, label, x: rect.left + rect.width / 2, y: rect.top }
-    )
-  }
-
-  const attributeColumnLabel = attributeFilter ? ATTRIBUTE_SHORT_LABELS[attributeFilter] : 'ATTR'
-  const roleHeaderTitle =
-    roleFilter === 'bestFit'
-      ? 'Best Fit rating — tap a number to see which role'
-      : `${ROLE_LABEL[roleFilter]} rating — tap a number to see the role name`
+  const selected = rows.find((c) => c.id === selectedId) ?? null
+  const ladderRoleId = activeRole ? activeRole.id : selected?.best?.roleId ?? null
+  const highlightedWeights = selected ? coefficientsForRole(ladderRoleId, selected) : null
+  const selectedFit = selected ? fitFor(selected) : null
+  const rosterTitle = activeRole ? `Ranked as ${activeRole.label}` : 'Ranked by best fit'
+  const gridCols = `${GRID_COLS}${attributeFilter ? ' 70px' : ''}`
 
   return (
-    <PageWrapper className="justify-start max-w-6xl">
-      <div className="w-full flex flex-col gap-6">
-        {/* Header */}
-        <div className="text-center pt-2">
-          <h1 className="text-3xl font-bold tracking-widest uppercase text-got-gold" style={{ fontFamily: 'Cinzel, serif' }}>
-            Characters
-          </h1>
-          <div className="gold-divider mt-3" />
-          <p className="text-got-parchment/40 text-sm mt-3 italic" style={{ fontFamily: 'EB Garamond, serif' }}>
-            The people of Westeros, and how well they fit each seat on the council.
-          </p>
-        </div>
+    <PageWrapper className="!p-0 !items-stretch">
+      <div style={{ background: BG, color: TEXT_BODY, fontFamily: GARAMOND, minHeight: '100vh', width: '100%', paddingBottom: 96, position: 'relative' }}>
+        {/* Ambient texture */}
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            pointerEvents: 'none',
+            background:
+              'radial-gradient(900px 460px at 50% -8%, rgba(201,167,90,.13), transparent 70%), repeating-linear-gradient(135deg, rgba(201,167,90,.022) 0 1px, transparent 1px 7px)',
+          }}
+        />
 
-        {/* Hero / profile */}
-        <AnimatePresence mode="wait">
-          <CharacterHero key={selectedCharacter?.id ?? 'none'} character={selectedCharacter} />
-        </AnimatePresence>
+        <div style={{ position: 'relative', maxWidth: 1240, margin: '0 auto', padding: '0 16px' }}>
+          {/* Header */}
+          <header style={{ padding: '26px 0 20px', textAlign: 'center' }}>
+            <div style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.38em', color: TEXT_FAINT, textTransform: 'uppercase' }}>
+              The Archive
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 13 }}>
+              <div style={{ flex: 1, maxWidth: 140, height: 1, background: 'linear-gradient(90deg, transparent, #4a3f28)' }} />
+              <h1 style={{ margin: 0, fontFamily: CINZEL, fontWeight: 700, fontSize: 29, lineHeight: 1.15, letterSpacing: '.06em', color: TEXT_BRIGHT }}>
+                Characters
+              </h1>
+              <div style={{ flex: 1, maxWidth: 140, height: 1, background: 'linear-gradient(270deg, transparent, #4a3f28)' }} />
+            </div>
+            <div style={{ fontSize: 16, color: TEXT_MUTED, marginTop: 8, fontStyle: 'italic' }}>
+              The people of Westeros, and how well they fit each seat on the council.
+            </div>
+          </header>
 
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name…"
-            className="w-full sm:w-56 py-2 px-3 rounded border border-stone-700 bg-stone-900/60 text-got-parchment text-sm placeholder:text-stone-600 focus:outline-none focus:border-got-gold/50"
-            style={{ fontFamily: 'EB Garamond, serif' }}
-          />
-
-          <div className="flex flex-wrap items-center gap-3">
-            <select
-              value={houseFilter}
-              onChange={(e) => setHouseFilter(e.target.value)}
-              className="py-2 px-3 rounded border border-stone-700 bg-stone-900/60 text-got-parchment text-sm focus:outline-none focus:border-got-gold/50"
-              style={{ fontFamily: 'Cinzel, serif' }}
-            >
-              {houses.map((h) => (
-                <option key={h} value={h}>
-                  {h === 'all' ? 'All Houses' : h}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={styleFilter}
-              onChange={(e) => setStyleFilter(e.target.value)}
-              className="py-2 px-3 rounded border border-stone-700 bg-stone-900/60 text-got-parchment text-sm focus:outline-none focus:border-got-gold/50"
-              style={{ fontFamily: 'Cinzel, serif' }}
-            >
-              <option value="all">All Styles</option>
-              {CHAMPION_STYLES.map((s) => (
-                <option key={s} value={s}>
-                  {CHAMPION_STYLE_LABELS[s]}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              title="Which role the Role column shows"
-              className="py-2 px-3 rounded border border-stone-700 bg-stone-900/60 text-got-parchment text-sm focus:outline-none focus:border-got-gold/50"
-              style={{ fontFamily: 'Cinzel, serif' }}
-            >
-              <option value="bestFit">Role: Best Fit</option>
-              {ROLES.map((r) => (
-                <option key={r.id} value={r.id}>
-                  Role: {r.label}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={attributeFilter}
-              onChange={(e) => setAttributeFilter(e.target.value)}
-              title="Which attribute the Attribute column shows"
-              className="py-2 px-3 rounded border border-stone-700 bg-stone-900/60 text-got-parchment text-sm focus:outline-none focus:border-got-gold/50"
-              style={{ fontFamily: 'Cinzel, serif' }}
-            >
-              <option value="">Attribute: none</option>
-              {ALL_ATTRIBUTE_KEYS.map((key) => (
-                <option key={key} value={key}>
-                  Attribute: {ATTRIBUTE_LABELS[key]}
-                </option>
-              ))}
-            </select>
-
-            <button
-              onClick={() => setShowCoefficients((v) => !v)}
-              className={[
-                'py-2 px-4 rounded border text-sm tracking-wide transition-all',
-                showCoefficients
-                  ? 'border-got-gold bg-got-gold/10 text-got-gold'
-                  : 'border-stone-700 text-stone-400 hover:border-stone-500 hover:text-stone-300',
-              ].join(' ')}
-              style={{ fontFamily: 'Cinzel, serif' }}
-            >
-              {showCoefficients ? 'Hide Coefficients' : 'Show Coefficients'}
-            </button>
-
-            <span className="text-stone-600 text-xs" style={{ fontFamily: 'Cinzel, serif' }}>
-              {sorted.length} / {characters.length}
-            </span>
-          </div>
-        </div>
-
-        {/* Role weight coefficients (reference table) */}
-        <AnimatePresence>
-          {showCoefficients && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.25 }}
-              className="overflow-hidden"
-            >
-              <p className="text-got-gold/70 text-xs tracking-widest uppercase mb-2" style={{ fontFamily: 'Cinzel, serif' }}>
-                Role Weight Coefficients
-              </p>
-              <CoefficientsTable />
-            </motion.div>
+          {loading && (
+            <p style={{ textAlign: 'center', color: TEXT_MUTED, fontStyle: 'italic', padding: '48px 0' }}>Loading the archives...</p>
           )}
-        </AnimatePresence>
+          {error && <p style={{ textAlign: 'center', color: '#c08d80', padding: '48px 0' }}>{error}</p>}
 
-        {/* Table */}
-        {loading && (
-          <p className="text-center text-got-parchment/50 italic py-12" style={{ fontFamily: 'EB Garamond, serif' }}>
-            Loading the archives...
-          </p>
-        )}
-
-        {error && (
-          <p className="text-center text-got-red-bright py-12" style={{ fontFamily: 'EB Garamond, serif' }}>
-            {error}
-          </p>
-        )}
-
-        {!loading && !error && (
-          <div className="w-full overflow-x-auto rounded-lg border border-stone-800">
-            <table
-              className="table-fixed"
-              style={{ width: TABLE_W, borderCollapse: 'separate', borderSpacing: 0 }}
-            >
-              <colgroup>
-                <col style={{ width: NAME_COL_W }} />
-                <col style={{ width: ROLE_COL_W }} />
-                <col style={{ width: STYLE_COL_W }} />
-                {CATEGORY_COLUMNS.map((col) => (
-                  <col key={col.key} style={{ width: CATEGORY_COL_W }} />
-                ))}
-                <col style={{ width: ATTRIBUTE_COL_W }} />
-              </colgroup>
-              <thead>
-                <tr className="border-b border-stone-800 bg-stone-900">
-                  <SortHeader
-                    label="Name"
-                    sortKey="name"
-                    activeKey={sortKey}
-                    direction={sortDir}
-                    onSort={handleSort}
-                    sticky
-                    leftOffset={STICKY_LEFT.name}
-                  />
-                  <SortHeader
-                    label="Role"
-                    title={roleHeaderTitle}
-                    sortKey="role"
-                    activeKey={sortKey}
-                    direction={sortDir}
-                    onSort={handleSort}
-                    align="right"
-                    dividerLeft
-                  />
-                  <SortHeader
-                    label="Style"
-                    sortKey="style"
-                    activeKey={sortKey}
-                    direction={sortDir}
-                    onSort={handleSort}
-                    title="Champion fighting style"
-                  />
-                  {CATEGORY_COLUMNS.map((col, i) => (
-                    <SortHeader
-                      key={col.key}
-                      label={col.label}
-                      title={`Average of the ${col.fullLabel} attributes`}
-                      sortKey={col.key}
-                      activeKey={sortKey}
-                      direction={sortDir}
-                      onSort={handleSort}
-                      align="right"
-                      dividerLeft={i === 0}
-                    />
-                  ))}
-                  <SortHeader
-                    label={attributeColumnLabel}
-                    title={attributeFilter ? ATTRIBUTE_LABELS[attributeFilter] : 'Choose an attribute in the filters above'}
-                    sortKey="attribute"
-                    activeKey={sortKey}
-                    direction={sortDir}
-                    onSort={handleSort}
-                    align="right"
-                    dividerLeft
-                  />
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((c) => {
-                  const isSelected = selectedId === c.id
-                  const roleDisplay = roleColumnDisplay(c, roleFilter)
-                  const attrValue = attributeColumnValue(c, attributeFilter)
-                  const frozenBg = isSelected ? 'bg-got-gold/10' : 'bg-got-black'
-                  return (
-                    <tr
-                      key={c.id}
-                      onClick={() => handleRowClick(c)}
-                      className={[
-                        'border-b border-stone-900 cursor-pointer transition-colors',
-                        isSelected ? 'bg-got-gold/10' : 'hover:bg-stone-900/50',
-                        !c.hasAttributes ? 'opacity-50' : '',
-                      ].join(' ')}
+          {!loading && !error && (
+            <>
+              {/* Hero */}
+              <section
+                style={{
+                  position: 'relative',
+                  padding: '20px 0 26px',
+                  borderTop: `1px solid ${BORDER_SOFT}`,
+                  borderBottom: `1px solid ${BORDER_FAINT}`,
+                  background: 'radial-gradient(760px 320px at 16% 0%, rgba(201,167,90,.08), transparent 68%)',
+                }}
+              >
+                {!selected ? (
+                  <div style={{ padding: '18px 4px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 22 }}>📜</span>
+                    <p style={{ margin: 0, fontSize: 15.5, fontStyle: 'italic', color: TEXT_MUTED }}>
+                      Select a character from the roster below to see their full attribute and role-fit breakdown.
+                    </p>
+                  </div>
+                ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '26px 34px' }}>
+                  {/* Identity */}
+                  <div style={{ flex: '1 1 236px', minWidth: 0, display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                    <div
+                      style={{
+                        width: 74,
+                        height: 92,
+                        flex: 'none',
+                        border: `1px solid ${BORDER}`,
+                        background: `linear-gradient(${PANEL_1}, ${PANEL_2})`,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        overflow: 'hidden',
+                      }}
                     >
-                      {/* Name + House (frozen col 1) */}
-                      <td
-                        className={['py-2 px-2 sticky z-10 overflow-hidden bg-got-charcoal', frozenBg].join(' ')}
-                        style={{ left: STICKY_LEFT.name }}
+                      {selected.image_url ? (
+                        <img src={selected.image_url} alt={selected.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <>
+                          <span style={{ fontFamily: CINZEL, fontWeight: 600, fontSize: 19, color: GOLD }}>{initials(selected.name)}</span>
+                          <span style={{ fontFamily: CINZEL, fontSize: 8.5, letterSpacing: '.16em', color: '#6d6352', textTransform: 'uppercase' }}>
+                            Portrait
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <h2 style={{ margin: 0, fontFamily: CINZEL, fontWeight: 700, fontSize: 25, lineHeight: 1.15, color: TEXT_BRIGHT }}>
+                        {selected.name}
+                      </h2>
+                      <div style={{ fontSize: 16, color: TEXT_MUTED, fontStyle: 'italic', marginTop: 3 }}>{selected.house || '—'}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 13 }}>
+                        {STYLE_GROUPS.map((group) =>
+                          selected[group.key] ? (
+                            <div key={group.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'baseline', gap: 6, fontSize: 14 }}>
+                              <span
+                                style={{
+                                  fontFamily: CINZEL,
+                                  fontSize: 10.5,
+                                  letterSpacing: '.12em',
+                                  color: TEXT_FAINT,
+                                  textTransform: 'uppercase',
+                                  flex: 'none',
+                                }}
+                              >
+                                {group.label}:
+                              </span>
+                              <span style={{ color: TEXT_BODY }}>{group.labels[selected[group.key]]}</span>
+                            </div>
+                          ) : null
+                        )}
+                        {STYLE_GROUPS.every((group) => !selected[group.key]) && (
+                          <div style={{ fontSize: 14, fontStyle: 'italic', color: TEXT_MUTED }}>No style set</div>
+                        )}
+                      </div>
+                      {!selected.attributes && (
+                        <p style={{ margin: '12px 0 0', fontSize: 15, fontStyle: 'italic', color: '#c08d80' }}>
+                          No attributes have been entered for this character yet.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Attributes */}
+                  {selected.attributes && (
+                    <div style={{ flex: '3 1 480px', minWidth: 0 }}>
+                      <SectionLabel
+                        right={
+                          <GhostButton small onClick={() => setShowCoefficients((v) => !v)}>
+                            {showCoefficients ? 'Hide coefficients' : 'Show coefficients'}
+                          </GhostButton>
+                        }
                       >
-                        <div className="flex flex-col leading-tight">
-                          <span
-                            className={['truncate', isSelected ? 'text-got-gold' : 'text-got-parchment'].join(' ')}
-                            title={c.name}
-                            style={{ fontFamily: 'Cinzel, serif' }}
-                          >
-                            {c.name}
-                          </span>
-                          {c.house && (
-                            <span
-                              className="truncate text-[0.65rem] text-got-parchment/40 italic"
-                              title={c.house}
-                              style={{ fontFamily: 'EB Garamond, serif' }}
-                            >
-                              {c.house}
-                            </span>
-                          )}
-                        </div>
-                      </td>
+                        Attributes
+                      </SectionLabel>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(228px,1fr))', gap: '18px 30px' }}>
+                        {CATEGORIES.map((cat) => {
+                          const avg = selected.categoryAverages?.[cat.id]
+                          return (
+                            <div key={cat.id}>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'baseline',
+                                  gap: 10,
+                                  paddingBottom: 7,
+                                  borderBottom: `1px solid ${BORDER_HAIR}`,
+                                }}
+                              >
+                                <span style={{ fontFamily: CINZEL, fontSize: 10.5, letterSpacing: '.24em', color: TEXT_FAINT, textTransform: 'uppercase' }}>
+                                  {cat.label}
+                                </span>
+                                <span style={{ fontFamily: CINZEL, fontWeight: 600, fontSize: 15, color: tier(avg).color }}>{avg ?? '—'}</span>
+                              </div>
+                              {cat.keys.map((key) => {
+                                const value = selected.attributes[key]
+                                const coef = highlightedWeights ? highlightedWeights[key] : undefined
+                                const keyed = coef !== undefined
+                                return (
+                                  <div
+                                    key={key}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 9,
+                                      padding: '6px 6px 6px 8px',
+                                      borderLeft: keyed ? `2px solid ${ACCENT}` : '2px solid transparent',
+                                      background: keyed ? 'linear-gradient(90deg,rgba(201,167,90,.09),transparent 70%)' : 'transparent',
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontSize: 15.5,
+                                        flex: '0 0 108px',
+                                        minWidth: 0,
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        color: keyed ? '#e8dcc2' : TEXT_MUTED,
+                                      }}
+                                    >
+                                      {ATTRIBUTE_LABELS[key]}
+                                    </span>
+                                    <div style={{ flex: 1, height: 4, background: TRACK, minWidth: 34 }}>
+                                      <div style={{ width: `${value ?? 0}%`, height: '100%', background: barColor(value, keyed) }} />
+                                    </div>
+                                    <span
+                                      style={{
+                                        fontFamily: CINZEL,
+                                        fontSize: 10.5,
+                                        letterSpacing: '.08em',
+                                        color: TEXT_LABEL,
+                                        flex: 'none',
+                                        width: showCoefficients ? 38 : 0,
+                                        textAlign: 'right',
+                                        overflow: 'hidden',
+                                      }}
+                                    >
+                                      {showCoefficients && keyed ? `+${coef.toFixed(2)}` : ''}
+                                    </span>
+                                    <span style={{ fontFamily: CINZEL, fontWeight: 600, fontSize: 14, flex: 'none', width: 26, textAlign: 'right', color: tier(value).color }}>
+                                      {value ?? '—'}
+                                    </span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
 
-                      {/* Role rating — tap the number to see which role it is */}
-                      <td className="py-2 px-2 text-right text-sm border-l border-stone-900">
-                        {roleDisplay ? (
-                          <button
-                            type="button"
-                            onClick={(e) => handleRoleNumberClick(e, c.id, ROLE_LABEL[roleDisplay.roleId])}
-                            className={['w-full text-right', tierColor(roleDisplay.rating)].join(' ')}
-                            style={{ fontFamily: 'Cinzel, serif' }}
-                          >
-                            {roleDisplay.rating}
-                          </button>
-                        ) : (
-                          <span className="text-stone-700">—</span>
-                        )}
-                      </td>
-
-                      {/* Style */}
-                      <td className="py-2 px-2 text-sm">
-                        {c.fightingStyle ? (
-                          <span
-                            className="truncate block text-got-parchment/70"
-                            title={CHAMPION_STYLE_LABELS[c.fightingStyle]}
-                            style={{ fontFamily: 'EB Garamond, serif' }}
-                          >
-                            {CHAMPION_STYLE_LABELS[c.fightingStyle]}
-                          </span>
-                        ) : (
-                          <span className="text-got-red-bright/50 italic text-xs">unset</span>
-                        )}
-                      </td>
-
-                      {CATEGORY_COLUMNS.map((col, i) => {
-                        const value = c.categoryAverages?.[col.key]
+                  {/* Seats */}
+                  {selected.attributes && (
+                    <div style={{ flex: '1 1 262px', minWidth: 0 }}>
+                      <SectionLabel>Seats</SectionLabel>
+                      <div style={{ fontSize: 15, color: TEXT_MUTED, fontStyle: 'italic', marginBottom: 10 }}>
+                        Weighted against {activeRole ? `${activeRole.label}\u2019s` : 'each seat\u2019s'} key attributes.
+                      </div>
+                      {selected.ladder.map((l) => {
+                        const on = l.roleId === ladderRoleId
+                        const clickable = l.rating != null
                         return (
-                          <td
-                            key={col.key}
-                            className={[
-                              'py-2 px-2 text-right text-sm',
-                              value != null ? tierColor(value) : 'text-stone-800',
-                              i === 0 ? 'border-l border-stone-900' : '',
-                            ].join(' ')}
-                            style={{ fontFamily: 'Cinzel, serif' }}
+                          <div
+                            key={l.roleId}
+                            onClick={() => clickable && setRoleFilter(l.roleId)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 10,
+                              padding: '8px 9px',
+                              cursor: clickable ? 'pointer' : 'default',
+                              borderBottom: `1px solid ${BORDER_ROW}`,
+                              borderLeft: on ? `2px solid ${GOLD}` : '2px solid transparent',
+                              background: on ? 'linear-gradient(90deg,rgba(201,167,90,.12),transparent)' : 'transparent',
+                            }}
                           >
-                            {value ?? '—'}
-                          </td>
+                            <span
+                              style={{
+                                fontFamily: CINZEL,
+                                fontSize: 12.5,
+                                flex: '1 1 0',
+                                minWidth: 0,
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                color: on ? TEXT_BRIGHT : '#d6cbb4',
+                              }}
+                            >
+                              {l.label}
+                            </span>
+                            <div style={{ flex: 1, height: 3, background: TRACK, minWidth: 26 }}>
+                              <div style={{ width: `${l.rating ?? 0}%`, height: '100%', background: barColor(l.rating, false) }} />
+                            </div>
+                            {l.rating != null ? (
+                              <>
+                                <span style={{ fontFamily: CINZEL, fontWeight: 600, fontSize: 15, flex: 'none', width: 28, textAlign: 'right', color: tier(l.rating).color }}>
+                                  {l.rating}
+                                </span>
+                                <span
+                                  style={{
+                                    fontFamily: CINZEL,
+                                    fontSize: 10,
+                                    letterSpacing: '.14em',
+                                    textTransform: 'uppercase',
+                                    flex: 'none',
+                                    width: 68,
+                                    color: tier(l.rating).color,
+                                  }}
+                                >
+                                  {tier(l.rating).label}
+                                </span>
+                              </>
+                            ) : (
+                              <span style={{ fontSize: 11, fontStyle: 'italic', color: TEXT_MUTED, flex: 'none' }}>no style set</span>
+                            )}
+                          </div>
                         )
                       })}
+                    </div>
+                  )}
+                </div>
+                )}
+              </section>
 
-                      <td className="py-2 px-2 text-right text-sm border-l border-stone-900" style={{ fontFamily: 'Cinzel, serif' }}>
-                        {attributeFilter ? (
-                          attrValue != null ? (
-                            <span className={tierColor(attrValue)}>{attrValue}</span>
-                          ) : (
-                            <span className="text-stone-700">—</span>
-                          )
-                        ) : (
-                          <span className="text-stone-800">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+              {/* Filters + roster */}
+              <section style={{ padding: '22px 0 0' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9, alignItems: 'center' }}>
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search by name or house"
+                    style={{
+                      flex: '2 1 220px',
+                      minWidth: 0,
+                      background: INPUT_BG,
+                      border: `1px solid ${BORDER_SOFT}`,
+                      color: TEXT_BODY,
+                      fontSize: 13,
+                      letterSpacing: '.08em',
+                      padding: '12px 13px',
+                      outline: 'none',
+                      minHeight: 46,
+                      fontFamily: GARAMOND,
+                    }}
+                  />
+                  <select value={houseFilter} onChange={(e) => setHouseFilter(e.target.value)} style={selectStyle}>
+                    <option value="all">All houses</option>
+                    {houses.map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </select>
+                  <select value={styleFilter} onChange={(e) => setStyleFilter(e.target.value)} style={selectStyle}>
+                    <option value="all">All styles</option>
+                    {STYLE_GROUPS.map((group) => (
+                      <optgroup key={group.key} label={group.label}>
+                        {group.options.map((s) => (
+                          <option key={`${group.key}:${s}`} value={`${group.key}:${s}`}>
+                            {group.labels[s]}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} style={selectStyle}>
+                    <option value="bestFit">Role · Best fit</option>
+                    {ROLES.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        Role · {r.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select value={attributeFilter} onChange={(e) => setAttributeFilter(e.target.value)} style={selectStyle}>
+                    <option value="">Attribute · none</option>
+                    {ALL_ATTRIBUTE_KEYS.map((key) => (
+                      <option key={key} value={key}>
+                        Attribute · {ATTRIBUTE_LABELS[key]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            {sorted.length === 0 && (
-              <p className="text-center text-stone-600 italic py-8" style={{ fontFamily: 'EB Garamond, serif' }}>
-                No characters match these filters.
-              </p>
-            )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
+                  <div style={{ width: 8, height: 8, flex: 'none', border: `1px solid ${ACCENT}`, transform: 'rotate(45deg)' }} />
+                  <div style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.26em', color: TEXT_LABEL, textTransform: 'uppercase' }}>
+                    {rosterTitle}
+                  </div>
+                  <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${BORDER}, transparent)` }} />
+                  <div style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.16em', color: TEXT_MUTED, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                    {sorted.length} of {characters.length}
+                  </div>
+                </div>
+
+                <div style={{ overflowX: 'auto', marginTop: 6 }}>
+                  <div style={{ minWidth: 730 }}>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: gridCols,
+                        gap: 10,
+                        alignItems: 'end',
+                        padding: '12px 8px 9px',
+                        borderBottom: `1px solid ${BORDER_GRID}`,
+                      }}
+                    >
+                      <div onClick={() => handleSort('name')} title="Sort by name" style={headerCellStyle('name')}>
+                        Name{sortArrow('name')}
+                      </div>
+                      <div onClick={() => handleSort('fit')} title="Role fit" style={headerCellStyle('fit', 'center')}>
+                        Fit{sortArrow('fit')}
+                      </div>
+                      {CATEGORIES.map((cat) => (
+                        <div key={cat.id} onClick={() => handleSort(cat.id)} title={cat.label} style={headerCellStyle(cat.id, 'center')}>
+                          {cat.code}
+                          {sortArrow(cat.id)}
+                        </div>
+                      ))}
+                      <div onClick={() => handleSort('style')} title={activeStyleGroup.label} style={headerCellStyle('style', 'right')}>
+                        {styleFilter === 'all' ? 'Style' : activeStyleGroup.label}{sortArrow('style')}
+                      </div>
+                      {attributeFilter && (
+                        <div
+                          onClick={() => handleSort('attribute')}
+                          title={ATTRIBUTE_LABELS[attributeFilter]}
+                          style={headerCellStyle('attribute', 'right')}
+                        >
+                          {ATTRIBUTE_SHORT_LABELS[attributeFilter] ?? 'ATTR'}
+                          {sortArrow('attribute')}
+                        </div>
+                      )}
+                    </div>
+
+                    {sorted.map((c) => {
+                      const on = c.id === selectedId
+                      const fit = fitFor(c)
+                      return (
+                        <div
+                          key={c.id}
+                          onClick={() => setSelectedId((current) => (current === c.id ? null : c.id))}
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: gridCols,
+                            gap: 10,
+                            alignItems: 'center',
+                            padding: '11px 8px',
+                            cursor: 'pointer',
+                            borderBottom: `1px solid ${BORDER_ROW}`,
+                            borderLeft: on ? `2px solid ${GOLD}` : '2px solid transparent',
+                            background: on ? 'linear-gradient(90deg,rgba(201,167,90,.13),transparent 65%)' : 'transparent',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
+                            <div
+                              style={{
+                                width: 9,
+                                height: 9,
+                                flex: 'none',
+                                transform: 'rotate(45deg)',
+                                border: '1px solid ' + ((fit ?? 0) >= 85 ? ACCENT : '#2f281c'),
+                                background: (fit ?? 0) >= 85 ? GOLD : 'transparent',
+                              }}
+                            />
+                            <div style={{ minWidth: 0 }}>
+                              <div
+                                style={{
+                                  fontFamily: CINZEL,
+                                  fontSize: 15.5,
+                                  lineHeight: 1.25,
+                                  color: on ? TEXT_BRIGHT : '#e8dcc2',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                }}
+                              >
+                                {c.name}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 14,
+                                  lineHeight: 1.3,
+                                  color: '#8f8571',
+                                  fontStyle: 'italic',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                }}
+                              >
+                                {c.house}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ fontFamily: CINZEL, fontWeight: 700, fontSize: 18, textAlign: 'center', color: tier(fit).color }}>
+                            {fit ?? '—'}
+                          </div>
+                          {CATEGORIES.map((cat) => {
+                            const v = c.categoryAverages?.[cat.id]
+                            return (
+                              <div key={cat.id} style={{ fontFamily: CINZEL, fontSize: 15, textAlign: 'center', color: tier(v).color }}>
+                                {v ?? '—'}
+                              </div>
+                            )
+                          })}
+                          <div
+                            style={{
+                              fontFamily: CINZEL,
+                              fontSize: 10.5,
+                              letterSpacing: '.14em',
+                              textTransform: 'uppercase',
+                              textAlign: 'right',
+                              color: TEXT_MUTED,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {c[activeStyleGroup.key] ? activeStyleGroup.labels[c[activeStyleGroup.key]] : 'Unset'}
+                          </div>
+                          {attributeFilter && (
+                            <div style={{ fontFamily: CINZEL, fontSize: 15, textAlign: 'right', color: tier(c.attributes?.[attributeFilter]).color }}>
+                              {c.attributes?.[attributeFilter] ?? '—'}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+
+                    {sorted.length === 0 && (
+                      <div style={{ padding: '34px 8px', fontSize: 16, color: TEXT_MUTED, fontStyle: 'italic' }}>
+                        No one in the archive answers to that.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 20px', padding: '16px 8px 0' }}>
+                  {CATEGORIES.map((cat) => (
+                    <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <span style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.14em', color: TEXT_LABEL, textTransform: 'uppercase' }}>
+                        {cat.code}
+                      </span>
+                      <span style={{ fontSize: 15, color: TEXT_MUTED }}>{cat.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
+        </div>
+
+        {/* Fixed "Selected" bar */}
+        {selected && (
+          <div
+            style={{
+              position: 'fixed',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 40,
+              borderTop: `1px solid ${BORDER_GRID}`,
+              background: 'linear-gradient(rgba(10,9,8,.93),rgba(7,6,6,.98))',
+              backdropFilter: 'blur(6px)',
+            }}
+          >
+            <div style={{ maxWidth: 1240, margin: '0 auto', padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: CINZEL, fontSize: 10.5, letterSpacing: '.22em', color: TEXT_FAINT, textTransform: 'uppercase' }}>
+                  Selected
+                </div>
+                <div style={{ fontSize: 17, color: TEXT_BRIGHT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {selected.name}
+                  {selected.best && ` · ${activeRole ? activeRole.label : selected.best.label} ${selectedFit}`}
+                </div>
+              </div>
+              <GoldButton onClick={() => setSheetOpen(true)}>Full profile</GoldButton>
+            </div>
           </div>
         )}
-      </div>
 
-      {/* Role-name popover for the Role column — fixed/viewport-positioned so it
-          always renders above the table regardless of horizontal scroll. */}
-      {rolePopover && (
-        <div
-          className="fixed z-50 -translate-x-1/2 -translate-y-full px-2 py-1 rounded border border-got-gold/40 bg-stone-800 text-got-gold text-xs whitespace-nowrap shadow-lg pointer-events-none"
-          style={{ left: rolePopover.x, top: rolePopover.y - 6, fontFamily: 'Cinzel, serif' }}
-        >
-          {rolePopover.label}
-        </div>
-      )}
+        {/* Full-profile bottom sheet */}
+        <AnimatePresence>
+          {sheetOpen && selected && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                onClick={() => setSheetOpen(false)}
+                style={{ position: 'absolute', inset: 0, background: 'rgba(4,4,4,.86)' }}
+              />
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 30 }}
+                transition={{ duration: 0.26, ease: 'easeOut' }}
+                style={{
+                  position: 'relative',
+                  width: '100%',
+                  maxWidth: 620,
+                  maxHeight: '92vh',
+                  overflowY: 'auto',
+                  borderTop: `1px solid ${BORDER}`,
+                  background: `linear-gradient(${SHEET_TOP}, ${SHEET_BOTTOM})`,
+                  padding: '24px 20px 26px',
+                }}
+              >
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.3em', color: '#b0a077', textTransform: 'uppercase' }}>
+                    {selected.fightingStyle ? CHAMPION_STYLE_LABELS[selected.fightingStyle] : 'No style set'}
+                  </div>
+                  <div style={{ fontFamily: CINZEL, fontWeight: 700, fontSize: 24, lineHeight: 1.2, color: TEXT_BRIGHT, marginTop: 8 }}>
+                    {selected.name}
+                  </div>
+                  <div style={{ fontSize: 16, color: TEXT_MUTED, fontStyle: 'italic', marginTop: 3 }}>{selected.house}</div>
+                  {selected.best && (
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 9, marginTop: 15 }}>
+                      <div style={{ fontFamily: CINZEL, fontWeight: 700, fontSize: 46, lineHeight: 0.95, color: GOLD_SOFT }}>{selectedFit}</div>
+                      <div style={{ textAlign: 'left', fontFamily: CINZEL, fontSize: 10.5, letterSpacing: '.18em', color: TEXT_FAINT, textTransform: 'uppercase' }}>
+                        Best fit
+                        <br />
+                        {activeRole ? activeRole.label : selected.best.label}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ height: 1, background: BORDER_HAIR, margin: '20px 0 16px' }} />
+
+                <div style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.24em', color: TEXT_FAINT, textTransform: 'uppercase', marginBottom: 10 }}>
+                  Every seat
+                </div>
+                {selected.ladder.map((l) => (
+                  <div key={l.roleId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: `1px solid ${BORDER_ROW}` }}>
+                    <span style={{ fontFamily: CINZEL, fontSize: 13, color: '#d6cbb4', flex: '1 1 0', minWidth: 0 }}>{l.label}</span>
+                    {l.rating != null ? (
+                      <>
+                        <span style={{ fontFamily: CINZEL, fontWeight: 600, fontSize: 15, color: tier(l.rating).color }}>{l.rating}</span>
+                        <span
+                          style={{
+                            fontFamily: CINZEL,
+                            fontSize: 10,
+                            letterSpacing: '.14em',
+                            textTransform: 'uppercase',
+                            color: tier(l.rating).color,
+                            width: 68,
+                            textAlign: 'right',
+                          }}
+                        >
+                          {tier(l.rating).label}
+                        </span>
+                      </>
+                    ) : (
+                      <span style={{ fontSize: 11, fontStyle: 'italic', color: TEXT_MUTED }}>no style set</span>
+                    )}
+                  </div>
+                ))}
+
+                {selected.attributes && (
+                  <>
+                    <div style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.24em', color: TEXT_FAINT, textTransform: 'uppercase', margin: '20px 0 10px' }}>
+                      All {ALL_ATTRIBUTE_KEYS.length} attributes
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))', gap: '4px 18px' }}>
+                      {ALL_ATTRIBUTE_KEYS.map((key) => (
+                        <div
+                          key={key}
+                          style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline', padding: '4px 0', borderBottom: `1px solid ${BORDER_ROW}` }}
+                        >
+                          <span style={{ fontSize: 15, color: TEXT_MUTED }}>{ATTRIBUTE_LABELS[key]}</span>
+                          <span style={{ fontFamily: CINZEL, fontSize: 13, color: tier(selected.attributes[key]).color }}>{selected.attributes[key]}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                <button
+                  onClick={() => setSheetOpen(false)}
+                  style={{
+                    marginTop: 16,
+                    width: '100%',
+                    border: `1px solid ${BORDER_SOFT}`,
+                    background: 'transparent',
+                    color: '#8a8070',
+                    fontFamily: CINZEL,
+                    fontWeight: 600,
+                    fontSize: 11,
+                    letterSpacing: '.16em',
+                    textTransform: 'uppercase',
+                    padding: '12px 15px',
+                    minHeight: 44,
+                    cursor: 'pointer',
+                    borderRadius: 0,
+                  }}
+                >
+                  Close
+                </button>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+      </div>
     </PageWrapper>
   )
 }

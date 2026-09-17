@@ -1,6 +1,9 @@
 import { supabase } from './supabase'
 import { ALL_ATTRIBUTE_KEYS, ATTRIBUTE_DB_COLUMNS } from '../data/attributes'
 import { CHAMPION_STYLE_FROM_DB } from '../data/championStyles'
+import { LEADERSHIP_STYLE_FROM_DB } from '../data/leadershipStyles'
+import { COMMAND_STYLE_FROM_DB } from '../data/commandStyles'
+import { COIN_STYLE_FROM_DB } from '../data/coinStyles'
 
 // Comma-separated DB column list, built once from the single source of
 // truth in data/attributes.js — if the attribute list changes again, this
@@ -19,14 +22,36 @@ export function mapAttributeRow(row) {
 }
 
 /**
- * Maps a raw DB fighting_style value ('non_fighter') to the camelCase
- * key the engine expects ('nonFighter'). Returns null if unset — a
+ * Maps a raw DB fighting_style value ('untrained') to the camelCase
+ * key the engine expects ('untrained'). Returns null if unset — a
  * character not yet tagged, expected during the data-entry rollout.
  * Exported — reused by enemyHouseService.js.
  */
 export function mapFightingStyle(dbValue) {
   if (!dbValue) return null
   return CHAMPION_STYLE_FROM_DB[dbValue] ?? null
+}
+
+/**
+ * Same shape as mapFightingStyle, for the 3 new style categories
+ * (characters.leadership_style / command_style / coin_style). Each
+ * returns null if unset — same data-entry-rollout posture as fighting
+ * style: these are new columns and none of the 64 shortlisted characters
+ * have been tagged yet.
+ */
+export function mapLeadershipStyle(dbValue) {
+  if (!dbValue) return null
+  return LEADERSHIP_STYLE_FROM_DB[dbValue] ?? null
+}
+
+export function mapCommandStyle(dbValue) {
+  if (!dbValue) return null
+  return COMMAND_STYLE_FROM_DB[dbValue] ?? null
+}
+
+export function mapCoinStyle(dbValue) {
+  if (!dbValue) return null
+  return COIN_STYLE_FROM_DB[dbValue] ?? null
 }
 
 /**
@@ -41,19 +66,21 @@ export function mapFightingStyle(dbValue) {
  *
  * Shapes the result into exactly what gameEngine/draftEngine.js and
  * gameEngine/ratings.js expect:
- *   { id, name, house, attributes: { strength, speed, ... }, fightingStyle }
+ *   { id, name, house, attributes: { strength, speed, ... },
+ *     fightingStyle, leadershipStyle, commandStyle, coinStyle }
  *
- * Note: fightingStyle can still be null here even though attributes are
- * guaranteed present — attributes and fighting style are two separate
- * data-entry passes, so a character can have one without the other yet.
- * Any code that computes a Champion rating needs to handle that (see
- * ratings.js's graceful-null behavior).
+ * Note: any of the 4 style fields can still be null here even though
+ * attributes are guaranteed present — attributes and each style tag are
+ * separate data-entry passes, so a character can have attributes without
+ * being tagged for some or all styles yet. Any code that computes a
+ * rating for a style-driven role needs to handle that (see ratings.js's
+ * graceful-null behavior via isRoleRatable()).
  */
 export async function fetchDraftablePool() {
   const { data, error } = await supabase.from('character_attributes').select(`
     character_id,
     ${SELECT_COLUMNS},
-    characters ( name, house, fighting_style )
+    characters ( name, house, fighting_style, leadership_style, command_style, coin_style )
   `)
 
   if (error) {
@@ -70,6 +97,9 @@ export async function fetchDraftablePool() {
     house: row.characters.house,
     attributes: mapAttributeRow(row),
     fightingStyle: mapFightingStyle(row.characters.fighting_style),
+    leadershipStyle: mapLeadershipStyle(row.characters.leadership_style),
+    commandStyle: mapCommandStyle(row.characters.command_style),
+    coinStyle: mapCoinStyle(row.characters.coin_style),
   }))
 }
 
@@ -80,9 +110,8 @@ export async function fetchDraftablePool() {
  * character_attributes, which Supabase treats as a LEFT join — a
  * character with no attributes row still comes back, just with
  * `attributes: null`. That's what lets the Characters page show gaps
- * instead of silently hiding them. Same posture for fighting_style — a
- * character with none yet still comes back, just with
- * `fightingStyle: null`.
+ * instead of silently hiding them. Same posture for every style column —
+ * a character with none yet still comes back, just with that field null.
  */
 export async function fetchAllCharactersForBrowse() {
   const { data, error } = await supabase
@@ -94,6 +123,9 @@ export async function fetchAllCharactersForBrowse() {
     house,
     image_url,
     fighting_style,
+    leadership_style,
+    command_style,
+    coin_style,
     character_attributes ( ${SELECT_COLUMNS} )
   `
     )
@@ -119,6 +151,9 @@ export async function fetchAllCharactersForBrowse() {
       hasAttributes: Boolean(attrRow),
       fightingStyle: mapFightingStyle(row.fighting_style),
       hasFightingStyle: Boolean(row.fighting_style),
+      leadershipStyle: mapLeadershipStyle(row.leadership_style),
+      commandStyle: mapCommandStyle(row.command_style),
+      coinStyle: mapCoinStyle(row.coin_style),
     }
   })
 }

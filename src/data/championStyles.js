@@ -15,14 +15,14 @@
  * instead of using one fixed table (see gameEngine/ratings.js).
  */
 
-export const CHAMPION_STYLES = ['powerhouse', 'swift', 'versatile', 'basic', 'nonFighter']
+export const CHAMPION_STYLES = ['powerhouse', 'swift', 'versatile', 'basic', 'untrained']
 
 export const CHAMPION_STYLE_LABELS = {
   powerhouse: 'Powerhouse',
   swift: 'Swift',
   versatile: 'Versatile',
   basic: 'Basic',
-  nonFighter: 'Non-Fighter',
+  untrained: 'Untrained',
 }
 
 // camelCase JS key -> DB text value stored in characters.fighting_style.
@@ -31,7 +31,7 @@ export const CHAMPION_STYLE_DB_VALUES = {
   swift: 'swift',
   versatile: 'versatile',
   basic: 'basic',
-  nonFighter: 'non_fighter',
+  untrained: 'untrained',
 }
 
 export const CHAMPION_STYLE_FROM_DB = Object.fromEntries(
@@ -67,12 +67,12 @@ export const CHAMPION_STYLE_WEIGHTS = {
     willpower: 0.2,
     stealth: 0.1,
   },
-  // Still a normal weighted rating (a non-fighter can have a perfectly
+  // Still a normal weighted rating (an untrained character can have a perfectly
   // respectable "overall") — the "always loses to a real fighter"
   // behavior belongs to the duel system (Part 2), not this formula.
   // Willpower-dominant on purpose: an untrained character's duel
   // performance is mostly about grit/resolve, not skill they don't have.
-  nonFighter: {
+  untrained: {
     willpower: 0.5,
     speed: 0.125,
     stealth: 0.125,

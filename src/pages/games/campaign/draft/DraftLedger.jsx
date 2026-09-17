@@ -1,6 +1,9 @@
 import { useState } from 'react'
-import { ROLE_WEIGHTS } from '../../../../data/roleWeights'
-import { CHAMPION_STYLE_WEIGHTS, CHAMPION_STYLE_LABELS } from '../../../../data/championStyles'
+import { weightsFor } from '../../../../gameEngine/ratings'
+import { CHAMPION_STYLE_LABELS } from '../../../../data/championStyles'
+import { LEADERSHIP_STYLE_LABELS } from '../../../../data/leadershipStyles'
+import { COMMAND_STYLE_LABELS } from '../../../../data/commandStyles'
+import { COIN_STYLE_LABELS } from '../../../../data/coinStyles'
 import { ATTRIBUTE_LABELS, ALL_ATTRIBUTE_KEYS } from '../../../../data/attributes'
 import { fitLabel } from './fitLabel'
 
@@ -12,28 +15,35 @@ import { fitLabel } from './fitLabel'
  * computed/owns rather than recalculating anything:
  *   - `character.fit` comes straight from draftEngine.assignRole (which
  *     itself calls gameEngine/ratings.js) — not recomputed here.
- *   - The "role coefficients" breakdown below reads ROLE_WEIGHTS /
- *     CHAMPION_STYLE_WEIGHTS directly (the same config roleRating() uses)
- *     just to decide which attributes to surface and in what order.
+ *   - The "role coefficients" breakdown below reads gameEngine/ratings.js's
+ *     own weightsFor() (the same lookup roleRating() uses internally) just
+ *     to decide which attributes to surface and in what order — one
+ *     shared implementation, rather than a second hand-rolled copy that
+ *     can drift out of sync with which roles are style-driven.
  *   - The full-ledger toggle reads ATTRIBUTE_LABELS / ALL_ATTRIBUTE_KEYS,
- *     the existing 23-attribute source of truth.
+ *     the existing 26-attribute source of truth.
  *
  * This is NOT a second Ledger page — it only ever renders inline as part
  * of the character-selection flow, for whichever character was just
  * assigned, and disappears once the player moves on.
  */
 
-function weightsForRole(roleId, fightingStyle) {
-  if (roleId === 'champion') {
-    return fightingStyle ? CHAMPION_STYLE_WEIGHTS[fightingStyle] : null
-  }
-  return ROLE_WEIGHTS[roleId] ?? null
+// Which label map to read a character's assigned style from, per role —
+// used only for the "Fighting style: ..." / "Leadership style: ..." line
+// under the character's name.
+const STYLE_DISPLAY_FOR_ROLE = {
+  champion: { key: 'fightingStyle', prefix: 'Fighting style', labels: CHAMPION_STYLE_LABELS },
+  king: { key: 'leadershipStyle', prefix: 'Leadership style', labels: LEADERSHIP_STYLE_LABELS },
+  hand: { key: 'leadershipStyle', prefix: 'Leadership style', labels: LEADERSHIP_STYLE_LABELS },
+  consort: { key: 'leadershipStyle', prefix: 'Leadership style', labels: LEADERSHIP_STYLE_LABELS },
+  commander: { key: 'commandStyle', prefix: 'Command style', labels: COMMAND_STYLE_LABELS },
+  masterOfCoin: { key: 'coinStyle', prefix: 'Coin style', labels: COIN_STYLE_LABELS },
 }
 
 // Top N attributes by |weight| — the ones that actually moved this
 // character's fit score for this role, positive or negative.
-function topWeightedAttributes(roleId, fightingStyle, count = 6) {
-  const weights = weightsForRole(roleId, fightingStyle)
+function topWeightedAttributes(roleId, character, count = 6) {
+  const weights = weightsFor(roleId, character)
   if (!weights) return []
   return Object.entries(weights)
     .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
@@ -52,7 +62,9 @@ export default function DraftLedger({ role, character, isFinal, onContinue }) {
   const [showFullLedger, setShowFullLedger] = useState(false)
 
   const tier = fitLabel(character.fit)
-  const breakdown = topWeightedAttributes(role.id, character.fightingStyle)
+  const breakdown = topWeightedAttributes(role.id, character)
+  const styleDisplay = STYLE_DISPLAY_FOR_ROLE[role.id]
+  const styleValue = styleDisplay && character[styleDisplay.key]
 
   return (
     <div className="rounded-lg border border-got-gold/30 bg-stone-900/40 p-5 sm:p-6">
@@ -67,9 +79,9 @@ export default function DraftLedger({ role, character, isFinal, onContinue }) {
           {character.name}
         </p>
         <p className="text-stone-500 text-sm mt-0.5">{character.house ?? 'Unaffiliated'}</p>
-        {role.id === 'champion' && character.fightingStyle && (
+        {styleValue && (
           <p className="text-stone-500 text-xs mt-1 italic" style={{ fontFamily: 'EB Garamond, serif' }}>
-            Fighting style: {CHAMPION_STYLE_LABELS[character.fightingStyle]}
+            {styleDisplay.prefix}: {styleDisplay.labels[styleValue]}
           </p>
         )}
 

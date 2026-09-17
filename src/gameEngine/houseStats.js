@@ -21,7 +21,7 @@
  * matching this function's existing tolerance for missing contributors.
  */
 
-import { effectiveAttribute } from './ratings'
+import { effectiveAttribute, isRoleRatable } from './ratings'
 
 // Exported so the dashboard's stat-breakdown modal can show exactly
 // which role/attribute pairs feed a given stat, straight off the same
@@ -84,11 +84,14 @@ export function computeHouseStats(roster) {
       .map(({ role, attr }) => {
         const character = byRole[role]
         if (!character) return null
-        // Champion needs a fighting style to have a computable rating at
-        // all — if this specific character somehow lacks one, skip their
-        // contribution rather than letting effectiveAttribute() throw.
-        if (role === 'champion' && !character.fightingStyle) return null
-        return effectiveAttribute(character.attributes, role, attr, character.fightingStyle)
+        // A style-driven role (Champion, King, Hand, Consort, Commander,
+        // Master of Coin — see ROLE_STYLE_KEY in ratings.js) needs its
+        // character to be tagged with the relevant style to have a
+        // computable rating at all. If this specific character somehow
+        // lacks it, skip their contribution rather than letting
+        // effectiveAttribute() throw and break the whole stats screen.
+        if (!isRoleRatable(role, character)) return null
+        return effectiveAttribute(character.attributes, role, attr, character)
       })
       .filter((v) => v !== null)
 
