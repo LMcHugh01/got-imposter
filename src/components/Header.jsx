@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { FaCrown } from 'react-icons/fa6'
 
 const NAV_LINKS = [
   { label: 'Home', to: '/' },
@@ -42,14 +43,14 @@ export default function Header() {
       }}
     >
       <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
-        {/* Brand */}
-        <Link to="/" className="flex items-center gap-2 select-none">
-          <span className="text-xl leading-none">👑</span>
+        {/* Brand — matches the Home hero's crown + "Westerosi Games" mark */}
+        <Link to="/" className="flex items-center gap-2.5 select-none">
+          <FaCrown className="text-lg text-got-gold leading-none" />
           <span
             className="text-base tracking-[0.2em] uppercase text-got-gold font-bold hidden sm:inline"
             style={{ fontFamily: 'Cinzel Decorative, serif' }}
           >
-            Game of Thrones
+            Westerosi Games
           </span>
         </Link>
 

@@ -13,10 +13,8 @@ import { ATTRIBUTE_CATEGORIES, ATTRIBUTE_LABELS, ATTRIBUTE_SHORT_LABELS, ALL_ATT
 /* ------------------------------------------------------------------ *
  * Palette — lifted directly from the "Archive" redesign mockup.
  * ------------------------------------------------------------------ */
-const BG = '#070606'
 const PANEL_1 = '#17130e'
 const PANEL_2 = '#0c0a09'
-const INPUT_BG = '#0c0a08'
 const SHEET_TOP = '#15110d'
 const SHEET_BOTTOM = '#0b0a09'
 
@@ -182,20 +180,20 @@ function GhostButton({ onClick, small, children }) {
   )
 }
 
+// Matches Houses.jsx's search/filter treatment — bg-got-charcoal/40 over a
+// stone-700 border reads correctly against the app's shared background,
+// unlike the old hardcoded INPUT_BG/BORDER_SOFT hex values below, which
+// were tuned only for this page's own (now-removed) background override.
+const selectClassName =
+  'rounded border border-stone-700 bg-got-charcoal/40 text-got-parchment focus:outline-none focus:border-got-gold/50 cursor-pointer'
 const selectStyle = {
   flex: '1 1 175px',
   minWidth: 0,
-  background: INPUT_BG,
-  border: `1px solid ${BORDER_SOFT}`,
-  color: '#d6cbb4',
   fontSize: '.72rem',
   letterSpacing: '.14em',
   textTransform: 'uppercase',
   padding: '12px 11px',
   minHeight: 46,
-  outline: 'none',
-  borderRadius: 0,
-  cursor: 'pointer',
   fontFamily: CINZEL,
 }
 
@@ -339,7 +337,7 @@ export default function Characters() {
 
   return (
     <PageWrapper className="!p-0 !items-stretch">
-      <div style={{ background: BG, color: TEXT_BODY, fontFamily: GARAMOND, minHeight: '100vh', width: '100%', paddingBottom: 96, position: 'relative' }}>
+      <div style={{ color: TEXT_BODY, fontFamily: GARAMOND, minHeight: '100vh', width: '100%', paddingBottom: 96, position: 'relative' }}>
         <div
           style={{
             position: 'fixed',
@@ -379,21 +377,18 @@ export default function Characters() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search by name or house"
+                  className="rounded border border-stone-700 bg-got-charcoal/40 text-got-parchment placeholder:text-stone-600 focus:outline-none focus:border-got-gold/50"
                   style={{
                     flex: '2 1 220px',
                     minWidth: 0,
-                    background: INPUT_BG,
-                    border: `1px solid ${BORDER_SOFT}`,
-                    color: TEXT_BODY,
                     fontSize: 13,
                     letterSpacing: '.08em',
                     padding: '12px 13px',
-                    outline: 'none',
                     minHeight: 46,
                     fontFamily: GARAMOND,
                   }}
                 />
-                <select value={houseFilter} onChange={(e) => setHouseFilter(e.target.value)} style={selectStyle}>
+                <select value={houseFilter} onChange={(e) => setHouseFilter(e.target.value)} className={selectClassName} style={selectStyle}>
                   <option value="all">All houses</option>
                   {houses.map((h) => (
                     <option key={h} value={h}>
@@ -401,7 +396,7 @@ export default function Characters() {
                     </option>
                   ))}
                 </select>
-                <select value={styleFilter} onChange={(e) => setStyleFilter(e.target.value)} style={selectStyle}>
+                <select value={styleFilter} onChange={(e) => setStyleFilter(e.target.value)} className={selectClassName} style={selectStyle}>
                   <option value="all">All styles</option>
                   {STYLE_GROUPS.map((group) => (
                     <optgroup key={group.key} label={group.label}>
@@ -413,7 +408,7 @@ export default function Characters() {
                     </optgroup>
                   ))}
                 </select>
-                <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} style={selectStyle}>
+                <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className={selectClassName} style={selectStyle}>
                   <option value="bestFit">Role · Best fit</option>
                   {ROLES.map((r) => (
                     <option key={r.id} value={r.id}>
@@ -421,7 +416,7 @@ export default function Characters() {
                     </option>
                   ))}
                 </select>
-                <select value={attributeFilter} onChange={(e) => setAttributeFilter(e.target.value)} style={selectStyle}>
+                <select value={attributeFilter} onChange={(e) => setAttributeFilter(e.target.value)} className={selectClassName} style={selectStyle}>
                   <option value="">Attribute · none</option>
                   {ALL_ATTRIBUTE_KEYS.map((key) => (
                     <option key={key} value={key}>

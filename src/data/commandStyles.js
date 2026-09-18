@@ -50,12 +50,13 @@ export const COMMAND_STYLE_WEIGHTS = {
   // Leads from the front, fights alongside troops — inspiring but
   // personally at risk. (Jon Snow, Robb Stark.)
   frontline: {
-    battleMorale: 0.25,
-    technique: 0.25,
-    strength: 0.15,
+    battleMorale: 0.3,
+    technique: 0.2,
+    strength: 0.1,
     command: 0.15,
     willpower: 0.1,
-    recruitment: 0.1,
+    endurance: 0.1,
+    recruitment: 0.05,
     selfPreservation: -0.1,
   },
   // Wins through overwhelming force and intimidation, accepts heavy

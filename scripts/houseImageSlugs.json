@@ -1,0 +1,20 @@
+[
+  { "apiId": null, "name": "House Stark", "slug": "house-stark" },
+  { "apiId": null, "name": "House Lannister", "slug": "house-lannister" },
+  { "apiId": null, "name": "House Baratheon", "slug": "house-baratheon" },
+  { "apiId": null, "name": "House Tyrell", "slug": "house-tyrell" },
+  { "apiId": null, "name": "House Martell", "slug": "house-martell" },
+  { "apiId": null, "name": "House Greyjoy", "slug": "house-greyjoy" },
+  { "apiId": null, "name": "House Arryn", "slug": "house-arryn" },
+  { "apiId": null, "name": "House Tully", "slug": "house-tully" },
+  { "apiId": null, "name": "House Targaryen", "slug": "house-targaryen" },
+  { "apiId": 999001, "name": "King Bran the Broken", "slug": "king-bran-the-broken" },
+  { "apiId": 999011, "name": "House Bolton", "slug": "house-bolton" },
+  { "apiId": 999012, "name": "House Karstark", "slug": "house-karstark" },
+  { "apiId": 999013, "name": "House Umber", "slug": "house-umber" },
+  { "apiId": 999014, "name": "House Clegane", "slug": "house-clegane" },
+  { "apiId": 999015, "name": "House Hightower", "slug": "house-hightower" },
+  { "apiId": 999016, "name": "House Tarly", "slug": "house-tarly" },
+  { "apiId": 999017, "name": "House Frey", "slug": "house-frey" },
+  { "apiId": 999018, "name": "House Royce", "slug": "house-royce" }
+]

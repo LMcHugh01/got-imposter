@@ -1,37 +1,37 @@
 import PageWrapper from '../components/PageWrapper'
 import GameCard from '../components/GameCard'
-import { GiCrossedSwords, GiScrollQuill, GiExecutionerHood, GiQuillInk } from 'react-icons/gi'
+import { GiCrossedSwords, GiScrollQuill, GiSpy, GiQuillInk } from 'react-icons/gi'
 import { FaMasksTheater } from "react-icons/fa6";
 
 const GAMES = [
   { 
     icon: FaMasksTheater, 
     title: 'Imposter', 
-    description: "Find the imposter before it's too late.", 
+    description: "A Game of Subterfuge.", 
     to: '/games/imposter' 
   },
   { 
     icon: GiCrossedSwords, 
     title: 'Campaign', 
-    description: 'Build your house. Conquer Westeros.', 
+    description: 'A Game of Strategy.', 
     to: '/games/campaign' 
   },
   { 
     icon: GiQuillInk, 
     title: 'Draft', 
-    description: 'Draft the highest-rated council you can.', 
+    description: 'A Game of Counsel.', 
     to: '/games/draft' 
   },
   { 
-    icon: GiExecutionerHood, 
-    title: 'Who Am I?', 
-    description: 'Identify the character from the clues.', 
+    icon: GiSpy, 
+    title: 'Whispers', 
+    description: 'A Game of Deduction.', 
     comingSoon: true 
   },
   { 
     icon: GiScrollQuill, 
     title: 'Trivia', 
-    description: 'Test your knowledge of Westeros.', 
+    description: 'A Game of Scholarship.', 
     comingSoon: true 
   },
 ]
@@ -71,7 +71,7 @@ export default function Games() {
       </PageWrapper>
 
       {/* Subtle Immersive Footer */}
-      <footer className="w-full text-center py-6 text-[10px] tracking-widest uppercase text-got-stone border-t border-stone-900/40 bg-black/10 z-10">
+      <footer className="w-full text-center text-[10px] tracking-widest uppercase text-got-parchment z-10">
         <p style={{ fontFamily: 'Cinzel, serif' }}>
           &copy; {new Date().getFullYear()} DKG Development
         </p>

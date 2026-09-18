@@ -5,7 +5,6 @@ import { FaMasksTheater, FaCrown } from "react-icons/fa6";
 import { 
   GiCrossedSwords, 
   GiSpy,
-  GiScrollUnfurled, 
   GiScrollQuill,
   GiQuillInk, 
   GiCastle 
@@ -69,31 +68,31 @@ export default function Home() {
               <GameCard 
                 icon={FaMasksTheater} 
                 title="Imposter" 
-                description="Find the imposter before it's too late." 
+                description="A Game of Subterfuge." 
                 to="/games/imposter" 
               />
               <GameCard 
                 icon={GiCrossedSwords} 
                 title="Campaign" 
-                description="Build your house. Conquer Westeros." 
+                description="A Game of Strategy." 
                 to="/games/campaign" 
               />
               <GameCard 
-                icon={GiScrollQuill} 
+                icon={GiQuillInk} 
                 title="Draft" 
-                description="Draft the highest-rated council you can." 
+                description="A Game of Counsel." 
                 to="/games/draft" 
               />
               <GameCard 
                 icon={GiSpy} 
-                title="Who Am I?" 
-                description="Identify the character from the clues." 
+                title="Whispers" 
+                description="A Game of Deduction." 
                 comingSoon={true} 
               />
               <GameCard 
-                icon={GiScrollUnfurled} 
+                icon={GiScrollQuill} 
                 title="Trivia" 
-                description="Test your knowledge of Westeros." 
+                description="A Game of Scholarship." 
                 comingSoon={true} 
               />
             </div>
@@ -125,7 +124,7 @@ export default function Home() {
                 icon={GiCastle} 
                 title="Houses" 
                 description="The great houses of the realm." 
-                comingSoon={true} 
+                comingSoon={false} 
               />
             </div>
           </motion.div>
@@ -134,7 +133,7 @@ export default function Home() {
       </PageWrapper>
 
       {/* Subtle Immersive Footer */}
-      <footer className="w-full text-center py-6 text-[10px] tracking-widest uppercase text-got-stone border-t border-stone-900/40 bg-black/10 z-10">
+      <footer className="w-full text-center text-[10px] tracking-widest uppercase text-got-parchment z-10">
         <p style={{ fontFamily: 'Cinzel, serif' }}>
           &copy; {new Date().getFullYear()} DKG Development
         </p>

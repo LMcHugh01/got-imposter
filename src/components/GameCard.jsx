@@ -29,12 +29,12 @@ export default function GameCard({ icon: Icon, title, description, to, comingSoo
       {/* Row layout putting the Icon and Title directly beside each other */}
       <div className="flex items-center gap-3">
         {Icon && (
-          <Icon className={`text-2xl shrink-0 ${comingSoon ? 'text-got-stone' : 'text-got-gold'}`} />
+          <Icon className={`text-2xl shrink-0 ${comingSoon ? 'text-got-parchment/40' : 'text-got-gold'}`} />
         )}
         <h3
           className={[
             'text-lg font-bold tracking-wide',
-            comingSoon ? 'text-got-stone' : 'text-got-gold',
+            comingSoon ? 'text-got-parchment/40' : 'text-got-gold',
           ].join(' ')}
           style={{ fontFamily: 'Cinzel, serif' }}
         >
@@ -45,7 +45,7 @@ export default function GameCard({ icon: Icon, title, description, to, comingSoo
       <p
         className={[
           'text-sm mt-3 leading-relaxed italic',
-          comingSoon ? 'text-got-stone/80' : 'text-got-parchment/60',
+          comingSoon ? 'text-got-parchment/25' : 'text-got-parchment/60',
         ].join(' ')}
         style={{ fontFamily: 'EB Garamond, serif' }}
       >
@@ -56,7 +56,10 @@ export default function GameCard({ icon: Icon, title, description, to, comingSoo
 
   if (comingSoon) {
     return (
-      <div className="relative w-full text-left rounded-lg border border-stone-900 bg-got-charcoal/20 p-5 cursor-not-allowed">
+      // Solid dark fill (not a low-opacity tint) so the card reads as its
+      // own box against any page background, not just the near-black one
+      // this was originally tuned for.
+      <div className="relative w-full text-left rounded-lg border border-stone-700/50 bg-black/40 p-5 cursor-not-allowed">
         {comingSoonBadge}
         {content}
       </div>
