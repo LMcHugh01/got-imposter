@@ -257,6 +257,7 @@ function HouseCard({ house, isSelected, onClick }) {
       className={[
         'relative text-left rounded-lg border overflow-hidden bg-got-charcoal transition-all duration-200',
         isSelected ? 'border-got-gold' : statusStyle ? statusStyle.card : 'border-stone-800 hover:border-got-gold/40',
+        sectionKey === 'royalty' ? 'col-span-2 sm:col-span-1' : '',
       ].join(' ')}
     >
       <div className="relative flex items-center justify-center p-6" style={{ background: gradient }}>
@@ -276,7 +277,7 @@ function HouseCard({ house, isSelected, onClick }) {
         </span>
       </div>
 
-      <div className={['p-4', statusStyle?.body].filter(Boolean).join(' ')}>
+      <div className={['p-3', statusStyle?.body].filter(Boolean).join(' ')}>
         {prefix && (
           <p className="text-[9px] tracking-[0.25em] uppercase text-got-parchment/35" style={{ fontFamily: 'Cinzel, serif' }}>
             {prefix}
@@ -596,7 +597,7 @@ function HouseModal({ house, houseEras, onClose, onYearSelect }) {
   )
 }
 
-function Timeline({ points, selectedYear, onSelect }) {
+function Timeline({ points, selectedYear, onSelect, rulerName }) {
   const current = points.find((p) => p.year === selectedYear)
   return (
     <div className="w-full flex flex-col items-center gap-4 sm:gap-6 py-2">
@@ -641,8 +642,16 @@ function Timeline({ points, selectedYear, onSelect }) {
               {current.season}
             </p>
           )}
-          <p className="text-xs sm:text-sm tracking-[0.2em] uppercase text-got-gold/80" style={{ fontFamily: 'Cinzel, serif' }}>
-            {current.title}
+          <p
+            className="font-bold leading-tight"
+            style={{
+              fontFamily: 'Cinzel, serif',
+              color: '#f7efdc',
+              textShadow: '0 0 30px rgba(201,167,90,0.2)',
+              fontSize: 'clamp(20px, 5vw, 30px)',
+            }}
+          >
+            {rulerName || current.title}
           </p>
           <p className="text-sm sm:text-base italic text-got-parchment/50 mt-1.5 max-w-lg" style={{ fontFamily: 'EB Garamond, serif' }}>
             {current.caption}
@@ -719,6 +728,7 @@ const ROLE_LABEL = {
 }
 
 function CouncilPanel({ seats, ruler }) {
+  const [expanded, setExpanded] = useState(false)
   if (!seats || seats.length === 0) return null
 
   // Kingsguard (or any future multi-member role) gets its own row below
@@ -728,71 +738,84 @@ function CouncilPanel({ seats, ruler }) {
   const otherSeats = seats.filter((s) => s.role !== 'kingsguard')
   const totalMembers = seats.reduce((sum, s) => sum + s.members.length, 0)
 
-  // "King Robert I Baratheon's Small Council" when there's a ruler to
-  // name, otherwise just the plain label — computeAuthority already
-  // handles King vs Queen vs Regent vs whatever else the label ends up
-  // being, so this doesn't need its own gender/title logic.
-  const headingLabel =
-    ruler && ruler.value ? `${ruler.label} ${ruler.value}'s Small Council` : 'Small Council'
-
   return (
     <div className="col-span-2 sm:col-span-3 rounded-lg border border-stone-800 bg-got-charcoal p-4 sm:p-6">
-      <SectionHeading label={headingLabel} count={totalMembers} />
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-5 sm:gap-x-8 gap-y-4 sm:gap-y-5">
-        {otherSeats.map(({ role, members }) => (
-          <div key={role} className="border-b border-stone-800/70 pb-4">
-            <div className="flex items-center gap-2">
-              <span className={members.length > 0 ? 'text-got-gold text-xs' : 'text-got-gold/30 text-xs'}>
-                {members.length > 0 ? '◆' : '◇'}
-              </span>
-              <span
-                className="text-[10px] tracking-[0.22em] uppercase text-got-parchment/40"
-                style={{ fontFamily: 'Cinzel, serif' }}
-              >
-                {ROLE_LABEL[role] ?? role}
-              </span>
-            </div>
-            {members.length > 0 ? (
-              <p className="text-sm text-got-parchment mt-1.5 leading-tight" style={{ fontFamily: 'EB Garamond, serif' }}>
-                {members.map((m) => m.characterName).join(', ')}
-              </p>
-            ) : (
-              <p className="text-sm italic text-got-parchment/30 mt-1.5" style={{ fontFamily: 'EB Garamond, serif' }}>
-                Unknown
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-2 pt-4 flex flex-wrap items-baseline gap-x-6 gap-y-2">
-        <span
-          className="text-[10px] tracking-[0.22em] uppercase text-got-parchment/40 shrink-0"
-          style={{ fontFamily: 'Cinzel, serif' }}
-        >
-          {ROLE_LABEL.kingsguard}
-        </span>
-        {kingsguard && kingsguard.members.length > 0 ? (
-          kingsguard.members.map((m, i) => (
-            <span
-              key={m.characterName}
-              className="flex items-center gap-1.5 text-sm text-got-parchment border-b border-stone-700 pb-0.5"
-              style={{ fontFamily: 'EB Garamond, serif' }}
-            >
-              {i === 0 && (
-                <span className="text-got-gold text-xs" title="Lord Commander">
-                  ★
-                </span>
-              )}
-              {m.characterName}
-            </span>
-          ))
-        ) : (
-          <span className="text-sm italic text-got-parchment/30" style={{ fontFamily: 'EB Garamond, serif' }}>
-            Unknown
+      {/* Clickable only matters on mobile — sm:cursor-default and the
+          chevron being sm:hidden both signal that above the breakpoint
+          this is just a heading, not a toggle. The content below is
+          forced visible from sm up regardless of `expanded`. */}
+      <button type="button" onClick={() => setExpanded((v) => !v)} className="w-full text-center mb-6 sm:cursor-default">
+        <div className="flex items-center justify-center gap-2">
+          <p
+            className="text-xs sm:text-sm tracking-[0.3em] uppercase text-got-gold/70"
+            style={{ fontFamily: 'Cinzel, serif' }}
+          >
+            Small Council{totalMembers ? ` · ${totalMembers}` : ''}
+          </p>
+          <span
+            className={['sm:hidden text-got-gold/60 text-[10px] transition-transform', expanded ? 'rotate-180' : ''].join(' ')}
+          >
+            ▾
           </span>
-        )}
+        </div>
+      </button>
+
+      <div className={[expanded ? 'block' : 'hidden', 'sm:block'].join(' ')}>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-5 sm:gap-x-8 gap-y-4 sm:gap-y-5">
+          {otherSeats.map(({ role, members }) => (
+            <div key={role} className="border-b border-stone-800/70 pb-4">
+              <div className="flex items-center gap-2">
+                <span className={members.length > 0 ? 'text-got-gold text-xs' : 'text-got-gold/30 text-xs'}>
+                  {members.length > 0 ? '◆' : '◇'}
+                </span>
+                <span
+                  className="text-[10px] tracking-[0.22em] uppercase text-got-parchment/40"
+                  style={{ fontFamily: 'Cinzel, serif' }}
+                >
+                  {ROLE_LABEL[role] ?? role}
+                </span>
+              </div>
+              {members.length > 0 ? (
+                <p className="text-sm text-got-parchment mt-1.5 leading-tight" style={{ fontFamily: 'EB Garamond, serif' }}>
+                  {members.map((m) => m.characterName).join(', ')}
+                </p>
+              ) : (
+                <p className="text-sm italic text-got-parchment/30 mt-1.5" style={{ fontFamily: 'EB Garamond, serif' }}>
+                  Unknown
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-2 pt-4 flex flex-wrap items-baseline gap-x-6 gap-y-2">
+          <span
+            className="text-[10px] tracking-[0.22em] uppercase text-got-parchment/40 shrink-0"
+            style={{ fontFamily: 'Cinzel, serif' }}
+          >
+            {ROLE_LABEL.kingsguard}
+          </span>
+          {kingsguard && kingsguard.members.length > 0 ? (
+            kingsguard.members.map((m, i) => (
+              <span
+                key={m.characterName}
+                className="flex items-center gap-1.5 text-sm text-got-parchment border-b border-stone-700 pb-0.5"
+                style={{ fontFamily: 'EB Garamond, serif' }}
+              >
+                {i === 0 && (
+                  <span className="text-got-gold text-xs" title="Lord Commander">
+                    ★
+                  </span>
+                )}
+                {m.characterName}
+              </span>
+            ))
+          ) : (
+            <span className="text-sm italic text-got-parchment/30" style={{ fontFamily: 'EB Garamond, serif' }}>
+              Unknown
+            </span>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -920,6 +943,15 @@ export default function Houses() {
     [housesAtYear, effectiveKingdom]
   )
 
+  // Whoever holds the Iron Throne this era, regardless of which kingdom
+  // tab is currently selected — looked up from the raw, unfiltered eras
+  // rather than housesAtYear, since the North tab shouldn't make this
+  // disappear or change.
+  const currentRulerName = useMemo(() => {
+    const royalEra = eras.find((e) => e.year === selectedYear && e.status === 'royalty')
+    return royalEra ? computeAuthority(royalEra).value : null
+  }, [eras, selectedYear])
+
   // filtered is already priority-sorted (Protector/Wardens first, etc.) —
   // splitting it by status preserves that order within each bucket rather
   // than needing a second sort. Anything with a status outside the known
@@ -986,7 +1018,7 @@ export default function Houses() {
 
         {!loading && !error && (
           <>
-            <Timeline points={TIMELINE_POINTS} selectedYear={selectedYear} onSelect={setSelectedYear} />
+            <Timeline points={TIMELINE_POINTS} selectedYear={selectedYear} onSelect={setSelectedYear} rulerName={currentRulerName} />
             <KingdomNav kingdoms={kingdoms} current={effectiveKingdom} onSelect={setKingdomFilter} />
           </>
         )}
