@@ -57,8 +57,7 @@ export async function fetchAllHouseEras() {
     houseId: row.house_id,
     year: row.year,
     eraLabel: row.era_label,
-    status: row.status, // 'active' | 'royalty' | 'diminished' | 'extinct' — drives muting
-    statusLabel: row.status_label, // flavor text the chip displays
+    status: row.status, // 'active' | 'royalty' | 'extinct', or free text (e.g. 'Exiled') for anything fallen-but-alive
     kingdom: row.kingdom,
     currentLord: row.current_lord,
     rulerLabel: row.ruler_label,
