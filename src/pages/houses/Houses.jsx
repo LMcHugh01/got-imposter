@@ -296,11 +296,11 @@ function HouseCard({ house, isSelected, onClick }) {
         )}
         <div className="h-px bg-gradient-to-r from-stone-700 to-transparent my-3" />
         {house.words ? (
-          <p className="text-sm max-[425px]:text-[10px] italic text-got-gold/70" style={{ fontFamily: 'EB Garamond, serif' }}>
+          <p className="text-sm max-[426px]:text-[11px] italic text-got-gold/70" style={{ fontFamily: 'EB Garamond, serif' }}>
             &ldquo;{house.words}&rdquo;
           </p>
         ) : (
-          <p className="text-xs max-[425px]:text-[10px] italic text-got-red-bright/50" style={{ fontFamily: 'EB Garamond, serif' }}>
+          <p className="text-xs max-[426px]:text-[11px] italic text-got-red-bright/50" style={{ fontFamily: 'EB Garamond, serif' }}>
             No recorded words
           </p>
         )}
@@ -486,14 +486,14 @@ function HouseModal({ house, houseEras, onClose, onYearSelect }) {
         <div className={['flex-1 min-w-0 md:overflow-y-auto p-4 sm:p-6 md:p-8', statusStyle?.body].filter(Boolean).join(' ')}>
           <div className="flex items-center gap-3">
             <p
-              className="text-xs tracking-widest uppercase text-got-parchment/40 whitespace-nowrap"
+              className="text-[10px] tracking-widest uppercase text-got-parchment/40 whitespace-nowrap"
               style={{ fontFamily: 'Cinzel, serif' }}
             >
               {`${house.year} AC`}{house.eraLabel ? ` · ${house.eraLabel}` : ''}
             </p>
             <div className="flex-1 h-px bg-gradient-to-r from-stone-700 to-transparent" />
             <p
-              className="text-xs tracking-widest uppercase text-got-gold/70 whitespace-nowrap"
+              className="text-[10px] tracking-widest uppercase text-got-gold/70 whitespace-nowrap"
               style={{ fontFamily: 'Cinzel, serif' }}
             >
               {activeBranch?.region ?? house.region}
@@ -517,7 +517,7 @@ function HouseModal({ house, houseEras, onClose, onYearSelect }) {
               too (as prose under the name) instead of getting their own
               grid cell. */}
           <div
-            className="mt-6 py-4 px-4 sm:py-6 sm:px-5 border-y border-stone-800"
+            className="mt-6 py-3 px-4 sm:px-5 border-y border-stone-800"
             style={{
               background: `radial-gradient(520px 170px at 0% 0%, ${house.tinctFrom ?? '#241f14'}38, transparent 72%), linear-gradient(#0c0a08, #090807)`,
             }}
@@ -542,7 +542,7 @@ function HouseModal({ house, houseEras, onClose, onYearSelect }) {
               </p>
             )}
             {titles && (
-              <div className="flex items-start gap-2.5 mt-4">
+              <div className="flex items-start gap-2.5">
                 <span className="w-1.5 h-1.5 mt-1.5 shrink-0 rotate-45 border border-got-gold/60" />
                 <p className="text-sm sm:text-base italic text-got-parchment/70 leading-relaxed" style={{ fontFamily: 'EB Garamond, serif' }}>
                   {titles}
@@ -739,12 +739,12 @@ function CouncilPanel({ seats, ruler }) {
   const totalMembers = seats.reduce((sum, s) => sum + s.members.length, 0)
 
   return (
-    <div className="col-span-2 sm:col-span-3 rounded-lg border border-stone-800 bg-got-charcoal p-4 sm:p-6">
+    <div className="col-span-2 sm:col-span-3 rounded-lg border border-stone-800 bg-got-charcoal py-3 px-6 sm:py-4 px-6">
       {/* Clickable only matters on mobile — sm:cursor-default and the
           chevron being sm:hidden both signal that above the breakpoint
           this is just a heading, not a toggle. The content below is
           forced visible from sm up regardless of `expanded`. */}
-      <button type="button" onClick={() => setExpanded((v) => !v)} className="w-full text-center mb-6 sm:cursor-default">
+      <button type="button" onClick={() => setExpanded((v) => !v)} className="w-full text-center sm:cursor-default">
         <div className="flex items-center justify-center gap-2">
           <p
             className="text-xs sm:text-sm tracking-[0.3em] uppercase text-got-gold/70"
@@ -761,7 +761,7 @@ function CouncilPanel({ seats, ruler }) {
       </button>
 
       <div className={[expanded ? 'block' : 'hidden', 'sm:block'].join(' ')}>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-5 sm:gap-x-8 gap-y-4 sm:gap-y-5">
+        <div className="grid grid-cols-1 mt-4 sm:grid-cols-3 gap-x-5 sm:gap-x-8 gap-y-4 sm:gap-y-5">
           {otherSeats.map(({ role, members }) => (
             <div key={role} className="border-b border-stone-800/70 pb-4">
               <div className="flex items-center gap-2">
@@ -788,7 +788,7 @@ function CouncilPanel({ seats, ruler }) {
           ))}
         </div>
 
-        <div className="mt-2 pt-4 flex flex-wrap items-baseline gap-x-6 gap-y-2">
+        <div className="pt-3 flex flex-wrap items-baseline gap-x-6 gap-y-2">
           <span
             className="text-[10px] tracking-[0.22em] uppercase text-got-parchment/40 shrink-0"
             style={{ fontFamily: 'Cinzel, serif' }}
@@ -862,7 +862,6 @@ export default function Houses() {
   const [selectedId, setSelectedId] = useState(null)
   const [search, setSearch] = useState('')
   const [regionFilter, setRegionFilter] = useState('all')
-  const [standingFilter, setStandingFilter] = useState('all')
   const [kingdomFilter, setKingdomFilter] = useState(null)
 
   useEffect(() => {
@@ -926,8 +925,6 @@ export default function Houses() {
       .filter((h) => {
         if (effectiveKingdom && h.kingdom !== effectiveKingdom) return false
         if (regionFilter !== 'all' && h.region !== regionFilter) return false
-        if (standingFilter === 'power' && FALLEN_SECTIONS.has(getSectionKey(h))) return false
-        if (standingFilter === 'fallen' && !FALLEN_SECTIONS.has(getSectionKey(h))) return false
         if (search.trim()) {
           const q = search.trim().toLowerCase()
           const haystack = [h.name, h.region, h.words, h.seats?.join(' ')].filter(Boolean).join(' ').toLowerCase()
@@ -936,7 +933,7 @@ export default function Houses() {
         return true
       })
       .sort((a, b) => housePriority(a) - housePriority(b) || a.name.localeCompare(b.name))
-  }, [housesAtYear, effectiveKingdom, regionFilter, standingFilter, search])
+  }, [housesAtYear, effectiveKingdom, regionFilter, search])
 
   const kingdomTotal = useMemo(
     () => housesAtYear.filter((h) => h.kingdom === effectiveKingdom).length,
@@ -1045,22 +1042,6 @@ export default function Houses() {
               </option>
             ))}
           </select>
-          <select
-            value={standingFilter}
-            onChange={(e) => setStandingFilter(e.target.value)}
-            className="flex-1 min-w-[140px] py-2.5 px-3 sm:py-3 sm:px-4 rounded border border-stone-700 bg-got-charcoal/40 text-got-parchment text-xs tracking-widest uppercase focus:outline-none focus:border-got-gold/50"
-            style={{ fontFamily: 'Cinzel, serif' }}
-          >
-            <option value="all">All Standings</option>
-            <option value="power">Still in Power</option>
-            <option value="fallen">Fallen or Diminished</option>
-          </select>
-          <span
-            className="text-stone-600 text-xs whitespace-nowrap ml-auto"
-            style={{ fontFamily: 'Cinzel, serif' }}
-          >
-            {filtered.length} / {kingdomTotal}
-          </span>
         </div>
 
         {/* Grid */}
