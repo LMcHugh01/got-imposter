@@ -5,12 +5,37 @@
   --font-cinzel-decorative: 'Cinzel Decorative', serif;
   --font-garamond: 'EB Garamond', serif;
 
-  --background-image-got: radial-gradient(
-    ellipse 60% 50% at 50% 0%,
-    rgba(201, 168, 76, 0.1) 0%,
-    #404040 100%
-  );
+  /* App background (used by AppLayout's bg-got). Same warm dark as the
+     game home screens: a soft gold glow near the top, darkening towards
+     the bottom. Positions are in px from the top so the glow stays behind
+     the hero on long pages instead of drifting down with page height. */
+  --background-image-got:
+    radial-gradient(900px 560px at 50% 280px, rgba(216, 184, 120, 0.12), transparent 70%),
+    radial-gradient(1400px 800px at 50% 100%, rgba(0, 0, 0, 0.35), transparent 70%);
 
+  --color-got-bg: #1f1d1a;
+
+  /* Realm palette — the warm dark / gold design used by the game screens.
+     Use these (bg-realm-gold, text-realm-muted, border-realm-gold/35 …)
+     instead of hex values in new components. */
+  --color-realm-bg: #1f1d1a;
+  --color-realm-panel: #23201c;
+  --color-realm-gold: #d8b878;
+  --color-realm-gold-hover: #e9cc90;
+  --color-realm-gilt: #e9cd94;
+  --color-realm-brass: #b39a68;
+  --color-realm-cream: #f1e6cc;
+  --color-realm-ink: #ece5d6;
+  --color-realm-body: #b8ad98;
+  --color-realm-note: #a89e8c;
+  --color-realm-muted: #8f8676;
+  --color-realm-dim: #7d7466;
+  --color-realm-faint: #6f6758;
+  --color-realm-ember: #c9766a;
+  --color-realm-rose: #d98a7c;
+  --color-realm-sage: #aebe96;
+  --color-realm-copper: #c79478;
+  --color-realm-lilac: #a896be;
   --color-got-charcoal: #1a1a1a;
   --color-got-dark: #111111;
   --color-got-gold: #c9a84c;
@@ -33,7 +58,8 @@ html, body, #root {
 }
 
 body {
-  background-color: #0a0a0a;
+  /* Matches the app background so overscroll/bounce never flashes black */
+  background-color: #1f1d1a;
   color: #f5e6c8;
   font-family: 'EB Garamond', serif;
   -webkit-font-smoothing: antialiased;
@@ -46,7 +72,7 @@ body {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #1a1a1a;
+  background: #1f1d1a;
 }
 ::-webkit-scrollbar-thumb {
   background: #c9a84c;
@@ -70,4 +96,15 @@ body {
   inset: 0;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+}
+
+/* Entrance animations used by game screens (e.g. Whispers reports and sheet) */
+@keyframes riseIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes sheetUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+@keyframes veil { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes shake { 10%, 90% { transform: translateX(-2px); } 30%, 70% { transform: translateX(4px); } 50% { transform: translateX(-5px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import PageWrapper from '../../components/PageWrapper'
 import { fetchAllHouses, fetchAllHouseEras, fetchAllSmallCouncil } from '../../lib/houseService'
+import PageHeading from '../../components/PageHeading'
 
 // Starts with two points; nothing below assumes exactly two, so a third
 // (say, 300 AC) is just another entry here plus matching house_eras rows —
@@ -994,24 +995,15 @@ export default function Houses() {
   }
 
   return (
-    <PageWrapper>
+    <PageWrapper className="!py-0">
       <div className="w-full max-w-6xl flex flex-col gap-8">
         {/* Header */}
-        <div className="text-center pt-4">
-          <p className="text-[10px] sm:text-[11px] tracking-[0.38em] uppercase text-got-parchment/40" style={{ fontFamily: 'Cinzel, serif' }}>
-            Game of Thrones
-          </p>
-          <div className="flex items-center justify-center gap-2.5 sm:gap-3.5 mt-3">
-            <div className="flex-1 max-w-[80px] sm:max-w-[140px] h-px bg-gradient-to-r from-transparent to-stone-700" />
-            <h1
-              className="font-bold leading-[1.15] tracking-[0.06em] text-got-parchment"
-              style={{ fontFamily: 'Cinzel, serif', fontSize: 'clamp(22px, 6vw, 29px)' }}
-            >
-              Westerosi Houses
-            </h1>
-            <div className="flex-1 max-w-[80px] sm:max-w-[140px] h-px bg-gradient-to-l from-transparent to-stone-700" />
-          </div>
-        </div>
+        <PageHeading
+          className="pt-[26px] pb-5"
+          eyebrow="Game of Thrones"
+          title="Houses"
+          subtitle="The people of Westeros, and how well they fit each seat on the council."
+        />
 
         {!loading && !error && (
           <>

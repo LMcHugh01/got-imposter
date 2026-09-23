@@ -1,23 +1,23 @@
 import { supabase } from './supabase'
-
-// Difficulty is cumulative: 'medium' pulls easy+medium characters,
-// 'hard' pulls the full pool. Matches the original fallback behavior.
-const DIFFICULTY_LEVELS = {
-  easy: ['easy'],
-  medium: ['easy', 'medium'],
-  hard: ['easy', 'medium', 'hard'],
-}
+import { normalizeDifficulties } from '../data/imposterOptions'
 
 /**
- * Fetch one random active character at or below the given difficulty.
+ * Fetch one random active character from the selected difficulties.
  *
- * Throws on failure or an empty result — this is the only place the app
- * talks to character data, so callers (Settings.jsx) are expected to catch
- * this and show a recoverable error rather than crash. There is no local
- * fallback dataset anymore; Supabase is the single source of truth.
+ * Difficulties are no longer cumulative: the player picks exactly which
+ * tiers to include, so ['easy', 'hard'] draws from easy and hard only.
+ * A single string (the old store value) is still accepted.
+ *
+ * Throws on failure or an empty result — callers (Settings.jsx) catch
+ * this and show a recoverable error. Supabase is the single source of truth.
+ *
+ * Sources (Game of Thrones / House of the Dragon / A Knight of the Seven
+ * Kingdoms / Lore): once the `characters` table has a `source` column,
+ * add `sources` as a second argument and chain `.in('source', sources)`.
+ * Until then every character is Game of Thrones, so no filter is needed.
  */
-export async function fetchRandomCharacter(difficulty) {
-  const levels = DIFFICULTY_LEVELS[difficulty] ?? DIFFICULTY_LEVELS.easy
+export async function fetchRandomCharacter(difficulties) {
+  const levels = normalizeDifficulties(difficulties)
 
   const { data, error } = await supabase
     .from('characters')
@@ -30,7 +30,7 @@ export async function fetchRandomCharacter(difficulty) {
   }
 
   if (!data || data.length === 0) {
-    throw new Error(`No active characters found for difficulty "${difficulty}"`)
+    throw new Error(`No active characters found for difficulty "${levels.join(', ')}"`)
   }
 
   const random = Math.floor(Math.random() * data.length)

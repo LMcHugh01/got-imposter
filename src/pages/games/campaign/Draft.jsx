@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from 'react'
 import PageWrapper from '../../../components/PageWrapper'
 import { fetchDraftablePool } from '../../../lib/characterAttributesService'
 import { fetchRandomEnemyHouse } from '../../../lib/enemyHouseService'
+import { recordGameEvent } from '../../../lib/recordSync'
 import { ROLES } from '../../../data/roleWeights'
 import {
   createDraftState,
@@ -65,6 +66,9 @@ export default function Draft() {
   // or a failed Rally all end the engagement, not just a retreat.
   const [engagement, setEngagement] = useState(null)
   const [rallyUsedThisEngagement, setRallyUsedThisEngagement] = useState(false)
+  // For The Young Wolf honour: has any battle or duel been lost this
+  // campaign? A retreat isn't a loss — it's a pause (see handleRetreat).
+  const [lostBattle, setLostBattle] = useState(false)
 
   // Gated behind DraftIntro's "Play Now" instead of firing on mount — the
   // player names their house first, and that's what actually kicks off
@@ -156,6 +160,7 @@ export default function Draft() {
       setScouted(false)
       setIntelReport(null)
       setBattleStart(null)
+      setLostBattle(false)
       setStatus('dashboard')
     } catch (err) {
       setError(err.message)
@@ -187,9 +192,10 @@ export default function Draft() {
   // counts, mid-fight strategy switches, surrender) and only calls this
   // once, when the fight is actually decided. The Duel Offer panel on the
   // dashboard calls the exact same handler with the exact same result
-  // shape (finalizeDuelResult mirrors finalizeBattleResult) — this
-  // function doesn't need to know which one happened.
+  // shape (finalizeDuelResult mirrors finalizeBattleResult, plus
+  // viaDuel: true) — this function doesn't need to know which one happened.
   const handleBattleComplete = useCallback((finalResult) => {
+    if (finalResult.outcome !== 'victory') setLostBattle(true)
     setBattleResult(finalResult)
     setEngagement(null)
     setRallyUsedThisEngagement(false)
@@ -221,9 +227,21 @@ export default function Draft() {
     setStatus('dashboard')
   }, [])
 
+  // Continue and Claim Victory only appear after a win (BattleResult),
+  // so both record a won battle — or a won duel, which counts as one too.
+  const recordWonBattle = useCallback(() => {
+    recordGameEvent('campaign', {
+      type: 'battle',
+      won: true,
+      duel: Boolean(battleResult?.viaDuel),
+      battleNumber: campaign.battleNumber,
+    })
+  }, [battleResult, campaign])
+
   const handleContinue = useCallback(async () => {
     setStatus('loading')
     try {
+      recordWonBattle()
       const nextCampaign = recordBattleResult(campaign, enemyHouse, battleResult)
       const house = await fetchRandomEnemyHouse(getCurrentTier(nextCampaign), nextCampaign.usedEnemyHouseIds)
       setCampaign(nextCampaign)
@@ -236,20 +254,20 @@ export default function Draft() {
       setError(err.message)
       setStatus('error')
     }
-  }, [campaign, enemyHouse, battleResult])
+  }, [campaign, enemyHouse, battleResult, recordWonBattle])
 
   const handleClaimVictory = useCallback(() => {
+    recordWonBattle()
+    recordGameEvent('campaign', { type: 'campaign', won: true, flawless: !lostBattle })
     const finalCampaign = recordBattleResult(campaign, enemyHouse, battleResult)
     setCampaign(finalCampaign)
     setStatus('campaignVictory')
-  }, [campaign, enemyHouse, battleResult])
+  }, [campaign, enemyHouse, battleResult, recordWonBattle, lostBattle])
 
   if (status === 'intro') {
-    return (
-      <PageWrapper className="justify-center">
-        <DraftIntro onPlay={handlePlay} />
-      </PageWrapper>
-    )
+    // DraftIntro renders its own full page (background, backdrop), so it
+    // isn't wrapped in PageWrapper here.
+    return <DraftIntro onPlay={handlePlay} />
   }
 
   if (status === 'loading') {

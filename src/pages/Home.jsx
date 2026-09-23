@@ -1,143 +1,57 @@
-import { motion } from 'framer-motion'
+import { useLocation } from 'react-router-dom'
 import PageWrapper from '../components/PageWrapper'
-import GameCard from '../components/GameCard'
-import { FaMasksTheater, FaCrown } from "react-icons/fa6";
-import { 
-  GiCrossedSwords, 
-  GiSpy,
-  GiScrollQuill,
-  GiQuillInk, 
-  GiCastle 
-} from 'react-icons/gi'
+import PageHeading from '../components/PageHeading'
+import { Diamond, GARAMOND } from '../components/GameHome'
+import { MenuList, SectionTitle } from '../components/MenuList'
+import GameGrid from '../components/GameGrid'
+import { EXPLORE } from '../data/games'
 
-export default function Home() {
+// Five diamonds with an outlined gold centre — the site's small mark.
+function HomeOrnament() {
   return (
-    /* bg-got-black loads your top-center golden ambient radial glow overlay */
-    <div className="bg-got-black min-h-screen text-got-parchment flex flex-col justify-between overflow-x-hidden selection:bg-got-gold/30 selection:text-white">
-      
-      <PageWrapper className="justify-start pt-12 pb-16 flex-grow z-10">
-        <div className="relative z-10 flex flex-col items-center gap-12 max-w-2xl w-full mx-auto px-4">
-          
-          {/* Hero Header */}
-          <div className="flex flex-col items-center gap-4 pt-4 text-center">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.6, ease: 'easeOut' }}
-              className="text-4xl text-got-gold select-none filter drop-shadow-[0_0_12px_rgba(201,168,76,0.3)]"
-            >
-              <FaCrown />
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.15, ease: 'easeOut' }}
-            >
-              <h1
-                className="text-4xl md:text-5xl font-black tracking-[0.2em] uppercase text-got-gold leading-tight drop-shadow-md"
-                style={{ fontFamily: 'Cinzel Decorative, serif' }}
-              >
-                Westerosi Games
-              </h1>
-              <div className="gold-divider my-4 h-[1px] w-32 mx-auto bg-gradient-to-r from-transparent via-got-gold/40 to-transparent" />
-              <p
-                className="text-xs md:text-sm tracking-[0.3em] uppercase text-got-parchment/60 font-medium"
-                style={{ fontFamily: 'Cinzel, serif' }}
-              >
-                The World Is Yours To Play
-              </p>
-            </motion.div>
-          </div>
-
-          {/* Games Category Container */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="w-full flex flex-col gap-5"
-          >
-            <p
-              className="text-got-gold/70 text-xs tracking-[0.25em] uppercase text-center font-bold"
-              style={{ fontFamily: 'Cinzel, serif' }}
-            >
-              Games
-            </p>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full">
-              <GameCard 
-                icon={FaMasksTheater} 
-                title="Imposter" 
-                description="A Game of Subterfuge." 
-                to="/games/imposter" 
-              />
-              <GameCard 
-                icon={GiCrossedSwords} 
-                title="Campaign" 
-                description="A Game of Strategy." 
-                to="/games/campaign" 
-              />
-              <GameCard 
-                icon={GiQuillInk} 
-                title="Draft" 
-                description="A Game of Counsel." 
-                to="/games/draft" 
-              />
-              <GameCard 
-                icon={GiSpy} 
-                title="Whispers" 
-                description="A Game of Deduction." 
-                comingSoon={true} 
-              />
-              <GameCard 
-                icon={GiScrollQuill} 
-                title="Trivia" 
-                description="A Game of Scholarship." 
-                comingSoon={true} 
-              />
-            </div>
-          </motion.div>
-
-          {/* Explore Category Container */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.45 }}
-            className="w-full flex flex-col gap-5 pb-4"
-          >
-            <p
-              className="text-got-gold/70 text-xs tracking-[0.25em] uppercase text-center font-bold"
-              style={{ fontFamily: 'Cinzel, serif' }}
-            >
-              Explore Westeros
-            </p>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full">
-              <GameCard 
-                icon={GiQuillInk} 
-                title="Characters" 
-                description="The people of Westeros." 
-                comingSoon={false} 
-                to="/characters" 
-              />
-              <GameCard 
-                icon={GiCastle} 
-                title="Houses" 
-                description="The great houses of the realm." 
-                comingSoon={false} 
-              />
-            </div>
-          </motion.div>
-
-        </div>
-      </PageWrapper>
-
-      {/* Subtle Immersive Footer */}
-      <footer className="w-full text-center text-[10px] tracking-widest uppercase text-got-parchment z-10">
-        <p style={{ fontFamily: 'Cinzel, serif' }}>
-          &copy; {new Date().getFullYear()} DKG Development
-        </p>
-      </footer>
+    <div className="flex items-center gap-3">
+      <Diamond size={6} fill="rgba(216,184,120,.35)" />
+      <Diamond size={8} fill="rgba(216,184,120,.6)" />
+      <Diamond size={12} line="#d8b878" className="mx-1" />
+      <Diamond size={8} fill="rgba(216,184,120,.6)" />
+      <Diamond size={6} fill="rgba(216,184,120,.35)" />
     </div>
+  )
+}
+
+/**
+ * pages/Home.jsx
+ *
+ * The lobby: a compact heading, the archive (Characters, Houses), then
+ * every game as a filterable grid.
+ */
+export default function Home() {
+  const farewell = useLocation().state?.farewell
+  return (
+    <PageWrapper className="justify-start text-realm-ink">
+      <PageHeading
+        className="pt-4"
+        ornament={<HomeOrnament />}
+        eyebrow="Game of Thrones"
+        title="Westerosi Games"
+        subtitle="The world is yours to play."
+      />
+
+      {farewell && (
+        <p role="status" className="mt-8 text-[18px] italic text-realm-gold text-center text-balance" style={GARAMOND}>
+          Your account has been deleted. Farewell, and may the roads be kind.
+        </p>
+      )}
+
+      <section className="w-full max-w-[760px] mx-auto mt-12">
+        <SectionTitle>Explore Westeros</SectionTitle>
+        <MenuList items={EXPLORE} marker="✦" />
+      </section>
+
+      <section className="w-full max-w-[1000px] mx-auto mt-20 pb-8">
+        <SectionTitle>Games</SectionTitle>
+        <GameGrid />
+      </section>
+    </PageWrapper>
   )
 }

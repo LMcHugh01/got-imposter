@@ -1,5 +1,4 @@
 .
-├── CLAUDE.md
 ├── folder_structure.txt
 ├── index.html
 ├── netlify.toml
@@ -8,38 +7,88 @@
 ├── public
 │   ├── _redirects
 │   ├── characters
+│   │   ├── arya-stark.jpg
+│   │   ├── benjen-stark.jpg
+│   │   ├── bran-stark.jpg
 │   │   ├── brienne-of-tarth.jpg
+│   │   ├── catelyn-stark.jpg
 │   │   ├── cersei-lannister.jpg
+│   │   ├── eddard-stark.jpg
+│   │   ├── edmure-tully.jpg
 │   │   ├── jamie-lannister.jpg
 │   │   ├── jon-snow.jpg
+│   │   ├── sansa-stark.jpg
 │   │   ├── tyrion-lannister.jpg
 │   │   └── tywin-lannister.jpg
+│   ├── houses
+│   │   └── sigils
+│   │       ├── house-arryn.svg
+│   │       ├── house-baratheon.svg
+│   │       ├── house-bolton.svg
+│   │       ├── house-clegane.svg
+│   │       ├── house-frey.svg
+│   │       ├── house-greyjoy.svg
+│   │       ├── house-hightower.svg
+│   │       ├── house-karstark.svg
+│   │       ├── house-lannister.svg
+│   │       ├── house-martell.svg
+│   │       ├── house-royce.svg
+│   │       ├── house-stark.svg
+│   │       ├── house-targaryen.svg
+│   │       ├── house-tarly.svg
+│   │       ├── house-tully.svg
+│   │       ├── house-tyrell.svg
+│   │       ├── house-umber.svg
+│   │       └── king-bran-the-broken.svg
 │   └── vite.svg
 ├── scripts
 │   ├── character-shortlist.csv
 │   ├── characterImageSlugs.json
 │   ├── checkCharacterImages.mjs
 │   ├── checkDraftPool.mjs
-│   └── seedCharacters.mjs
+│   ├── checkHouseImages.mjs
+│   ├── houseImageSlugs.json
+│   ├── seedCharacters.mjs
+│   └── seedHouses.mjs
 ├── src
 │   ├── App.jsx
 │   ├── components
 │   │   ├── AppLayout.jsx
+│   │   ├── AuthForm.jsx
 │   │   ├── ComingSoon.jsx
 │   │   ├── FlipCard.jsx
 │   │   ├── Footer.jsx
 │   │   ├── GameCard.jsx
+│   │   ├── GameGrid.jsx
+│   │   ├── GameHome.jsx
 │   │   ├── Header.jsx
+│   │   ├── HonourToast.jsx
+│   │   ├── HouseNameIntro.jsx
+│   │   ├── MenuList.jsx
+│   │   ├── PageHeading.jsx
 │   │   ├── PageWrapper.jsx
 │   │   ├── PlayerList.jsx
+│   │   ├── RecordPrompt.jsx
 │   │   └── RoleScoreBadge.jsx
 │   ├── config
 │   │   └── features.js
 │   ├── data
+│   │   ├── accountHouses.js
+│   │   ├── allegiances.js
 │   │   ├── attributes.js
 │   │   ├── championStyles.js
-│   │   └── roleweights.js
+│   │   ├── coinStyles.js
+│   │   ├── commandStyles.js
+│   │   ├── games.js
+│   │   ├── honours.js
+│   │   ├── imposterOptions.js
+│   │   ├── leadershipStyles.js
+│   │   ├── ravens.js
+│   │   ├── roleweights.js
+│   │   └── whispers.js
 │   ├── gameEngine
+│   │   ├── allegiances.js
+│   │   ├── allegiances.test.js
 │   │   ├── battleEngine.js
 │   │   ├── battleEngine.test.js
 │   │   ├── campaign.js
@@ -58,28 +107,54 @@
 │   │   ├── modifiers.js
 │   │   ├── ratings.js
 │   │   ├── ratings.test.js
+│   │   ├── ravens.js
+│   │   ├── ravens.test.js
+│   │   ├── record.js
+│   │   ├── record.test.js
 │   │   ├── resources.js
-│   │   └── resources.test.js
+│   │   ├── resources.test.js
+│   │   ├── whispers.js
+│   │   └── whispers.test.js
 │   ├── index.css
+│   ├── index.ts
 │   ├── lib
+│   │   ├── allegiancesStorage.js
+│   │   ├── auth.jsx
 │   │   ├── characterAttributesService.js
 │   │   ├── characterService.js
 │   │   ├── enemyHouseService.js
 │   │   ├── gameLogic.js
-│   │   └── supabase.js
+│   │   ├── houseService.js
+│   │   ├── ravensService.js
+│   │   ├── ravensStorage.js
+│   │   ├── recordSync.js
+│   │   ├── supabase.js
+│   │   ├── useScrollOnNavigate.js
+│   │   └── whispersStorage.js
 │   ├── main.jsx
 │   ├── pages
-│   │   ├── Draft.jsx
 │   │   ├── Games.jsx
 │   │   ├── Home.jsx
-│   │   ├── ImposterHome.jsx
+│   │   ├── Privacy.jsx
 │   │   ├── Trivia.jsx
 │   │   ├── WhoAmI.jsx
 │   │   ├── about
 │   │   │   └── About.jsx
+│   │   ├── account
+│   │   │   └── Account.jsx
+│   │   ├── auth
+│   │   │   ├── AuthConfirm.jsx
+│   │   │   ├── CheckEmail.jsx
+│   │   │   ├── Forgot.jsx
+│   │   │   ├── LogIn.jsx
+│   │   │   ├── ResetPassword.jsx
+│   │   │   └── SignUp.jsx
 │   │   ├── characters
 │   │   │   └── Characters.jsx
 │   │   ├── games
+│   │   │   ├── allegiances
+│   │   │   │   ├── AllegiancesGame.jsx
+│   │   │   │   └── AllegiancesHome.jsx
 │   │   │   ├── campaign
 │   │   │   │   ├── CampaignVictory.jsx
 │   │   │   │   ├── Draft.jsx
@@ -118,15 +193,26 @@
 │   │   │   ├── imposter
 │   │   │   │   ├── CardReveal.jsx
 │   │   │   │   ├── EliminationReveal.jsx
+│   │   │   │   ├── ImposterHome.jsx
 │   │   │   │   ├── Results.jsx
 │   │   │   │   ├── Settings.jsx
 │   │   │   │   └── Voting.jsx
+│   │   │   ├── ravens
+│   │   │   │   ├── RavensGame.jsx
+│   │   │   │   ├── RavensHome.jsx
+│   │   │   │   ├── RavensScreens.jsx
+│   │   │   │   └── RavensSetup.jsx
 │   │   │   ├── trivia
-│   │   │   └── whoami
+│   │   │   └── whispers
+│   │   │       ├── GuessReport.jsx
+│   │   │       ├── SuspectSearch.jsx
+│   │   │       ├── WhispersGame.jsx
+│   │   │       ├── WhispersHome.jsx
+│   │   │       └── WhispersResult.jsx
 │   │   └── houses
 │   │       └── Houses.jsx
 │   └── store
 │       └── gameStore.js
 └── vite.config.js
 
-24 directories, 106 files
+30 directories, 186 files

@@ -9,6 +9,7 @@ import { LEADERSHIP_STYLES, LEADERSHIP_STYLE_LABELS } from '../../data/leadershi
 import { COMMAND_STYLES, COMMAND_STYLE_LABELS } from '../../data/commandStyles'
 import { COIN_STYLES, COIN_STYLE_LABELS } from '../../data/coinStyles'
 import { ATTRIBUTE_CATEGORIES, ATTRIBUTE_LABELS, ATTRIBUTE_SHORT_LABELS, ALL_ATTRIBUTE_KEYS } from '../../data/attributes'
+import PageHeading from '../../components/PageHeading'
 
 /* ------------------------------------------------------------------ *
  * Palette — lifted directly from the "Archive" redesign mockup.
@@ -349,21 +350,12 @@ export default function Characters() {
         />
 
         <div style={{ position: 'relative', maxWidth: 1240, margin: '0 auto', padding: '0 16px' }}>
-          <header style={{ padding: '26px 0 20px', textAlign: 'center' }}>
-            <div style={{ fontFamily: CINZEL, fontSize: 11, letterSpacing: '.38em', color: TEXT_FAINT, textTransform: 'uppercase' }}>
-              The Archive
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 13 }}>
-              <div style={{ flex: 1, maxWidth: 140, height: 1, background: 'linear-gradient(90deg, transparent, #4a3f28)' }} />
-              <h1 style={{ margin: 0, fontFamily: CINZEL, fontWeight: 700, fontSize: 29, lineHeight: 1.15, letterSpacing: '.06em', color: TEXT_BRIGHT }}>
-                Characters
-              </h1>
-              <div style={{ flex: 1, maxWidth: 140, height: 1, background: 'linear-gradient(270deg, transparent, #4a3f28)' }} />
-            </div>
-            <div style={{ fontSize: 16, color: TEXT_MUTED, marginTop: 8, fontStyle: 'italic' }}>
-              The people of Westeros, and how well they fit each seat on the council.
-            </div>
-          </header>
+          <PageHeading
+            className="pt-[26px] pb-5"
+            eyebrow="Game of Thrones"
+            title="Characters"
+            subtitle="The people of Westeros, and how well they fit each seat on the council."
+          />
 
           {loading && (
             <p style={{ textAlign: 'center', color: TEXT_MUTED, fontStyle: 'italic', padding: '48px 0' }}>Loading the archives...</p>

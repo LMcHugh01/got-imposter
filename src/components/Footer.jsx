@@ -1,19 +1,19 @@
 export default function Footer() {
   return (
-    <footer className="border-t border-stone-700/50 py-6">
-      <div className="max-w-4xl mx-auto px-4 flex flex-col items-center gap-3">
-        <div className="flex items-center gap-3 w-full max-w-xs">
-          <div className="flex-1 gold-divider" />
-          <span className="text-got-parchment text-sm">⚔</span>
-          <div className="flex-1 gold-divider" />
-        </div>
-        <p
-          className="text-got-parchment text-xs tracking-widest uppercase text-center"
-          style={{ fontFamily: 'Cinzel, serif' }}
-        >
-          A Song of Ice and Fire · Fan Project
-        </p>
-      </div>
+    <footer className="flex flex-col items-center gap-[18px] text-center px-6 pt-16 pb-12">
+      <div className="w-[7px] h-[7px] rotate-45 bg-[rgba(216,184,120,.5)]" aria-hidden="true" />
+      <p
+        className="text-[11px] uppercase tracking-[0.32em] text-[#8f8676]"
+        style={{ fontFamily: 'Cinzel, serif' }}
+      >
+        A Song of Ice and Fire · Fan Project
+      </p>
+      <p
+        className="text-[10px] uppercase tracking-[0.3em] text-[#6f6758]"
+        style={{ fontFamily: 'Cinzel, serif' }}
+      >
+        © {new Date().getFullYear()} DKG Development
+      </p>
     </footer>
   )
 }

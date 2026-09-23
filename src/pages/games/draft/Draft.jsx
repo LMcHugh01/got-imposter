@@ -15,6 +15,7 @@ import DraftOathModal from './DraftOathModal'
 import DraftLedger from './DraftLedger'
 import Roster from './Roster'
 import DraftIntro from './DraftIntro'
+import { recordGameEvent } from '../../../lib/recordSync'
 
 /**
  * pages/games/draft/Draft.jsx
@@ -117,6 +118,11 @@ export default function Draft() {
   const handleDismissLedger = useCallback(() => {
     if (draftState && isDraftComplete(draftState)) {
       setStatus('complete')
+      // The council's rating is the average fit across every seat, the same
+      // "Overall" figure shown in the draft header.
+      const seated = Object.values(draftState.roleAssignments).filter(Boolean)
+      const rating = seated.reduce((sum, c) => sum + c.fit, 0) / seated.length
+      recordGameEvent('draft', { rating })
     }
     setJustSworn(null)
   }, [draftState])
@@ -134,11 +140,9 @@ export default function Draft() {
   }, [])
 
   if (status === 'intro') {
-    return (
-      <PageWrapper className="justify-center">
-        <DraftIntro onPlay={handlePlay} />
-      </PageWrapper>
-    )
+    // DraftIntro renders its own full page (background, backdrop), so it
+    // isn't wrapped in PageWrapper here.
+    return <DraftIntro onPlay={handlePlay} />
   }
 
   if (status === 'loading') {
