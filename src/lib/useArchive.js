@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { fetchAllHouses, fetchAllHouseEras } from './houseService'
+import { fetchAllHouses, fetchAllHouseEras, fetchAllCastles } from './houseService'
 
 /**
  * lib/useArchive.js
  *
- * Houses and their per-era rows, fetched once per visit and shared by
- * everything that asks (the Maps page and its map). Pass `enabled = false`
+ * Houses, their per-era rows and the map's castles, fetched once per visit
+ * and shared by everything that asks (the Maps page and its map). If the
+ * castles can't be loaded (say the table isn't there yet), the map just
+ * shows none; the houses still load. Pass `enabled = false`
  * to skip the fetch entirely (the home page's simple map needs no houses).
  */
 
@@ -13,7 +15,15 @@ let pending = null
 
 function load() {
   if (!pending) {
-    pending = Promise.all([fetchAllHouses(), fetchAllHouseEras()]).then(([houses, eras]) => ({ houses, eras }))
+    const castles = fetchAllCastles().catch((err) => {
+      console.warn(err.message)
+      return []
+    })
+    pending = Promise.all([fetchAllHouses(), fetchAllHouseEras(), castles]).then(([houses, eras, castleRows]) => ({
+      houses,
+      eras,
+      castles: castleRows,
+    }))
     pending.catch(() => {
       pending = null // let a later visit try again
     })
@@ -22,14 +32,14 @@ function load() {
 }
 
 export function useArchive(enabled = true) {
-  const [state, setState] = useState({ houses: null, eras: null, error: null })
+  const [state, setState] = useState({ houses: null, eras: null, castles: null, error: null })
 
   useEffect(() => {
     if (!enabled) return
     let cancelled = false
     load()
       .then((data) => !cancelled && setState({ ...data, error: null }))
-      .catch((err) => !cancelled && setState({ houses: null, eras: null, error: err.message || 'Failed to load houses.' }))
+      .catch((err) => !cancelled && setState({ houses: null, eras: null, castles: null, error: err.message || 'Failed to load houses.' }))
     return () => {
       cancelled = true
     }

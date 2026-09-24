@@ -3,8 +3,6 @@ import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import PageWrapper from '../../components/PageWrapper'
 import { fetchAllHouses, fetchAllHouseEras, fetchAllSmallCouncil } from '../../lib/houseService'
-import PageHeading from '../../components/PageHeading'
-import Timeline from '../../components/Timeline'
 import { TIMELINE_POINTS } from '../../data/timeline'
 
 // Display/tab order for kingdoms — fixed here rather than derived
@@ -12,78 +10,80 @@ import { TIMELINE_POINTS } from '../../data/timeline'
 // houses (and possibly more kingdoms) get added later.
 const KINGDOM_ORDER = ['Seven Kingdoms', 'Six Kingdoms', 'Kingdom of the North']
 
-// Down to two columns driving all of this now: `status` (three fixed
-// values — active, royalty, extinct — plus, for anything fallen-but-alive,
-// free text like 'Exiled'/'Restored'/'Diminished' that IS the display
-// text, not a separate label) and `tier` (great/vassal, structural, never
-// changes per era). Wardens aren't a status at all — that section is
-// derived from commanderTitles, which already has the data.
+// Two columns decide where a house sits in a given era:
 //
-// getSectionKey is the single source of truth for "which of the six grid
-// sections does this house belong in this era" — used both for the page's
-// bucketing and for each card's own styling, so the two can't drift apart.
-// royalty/extinct/diminished span both tiers (a diminished vassal sits with
-// diminished Great Houses, not off in its own Vassals corner); only
-// 'active' status splits further by tier into Wardens/Great Houses/Vassals.
-function getSectionKey(house) {
-  if (house.status === 'royalty') return 'royalty'
-  if (house.status === 'extinct') return 'extinct'
-  if (house.status !== 'active') return 'diminished'
-  if (house.tier === 'vassal') return 'vassal'
-  const hasWarden = house.commanderTitles?.some((key) => key.startsWith('warden_of_'))
-  return hasWarden ? 'wardens' : 'active'
+//   status  active | royalty | exiled | extinct, or free text for anything
+//           else fallen-but-alive ('Diminished', 'Restored'). The free text
+//           IS the chip text; those houses stay in their tier's section.
+//   tier    great | lordly | knightly | unknown (noble rank not known), or
+//           order for a sworn order rather than a family (the Night's Watch).
+//
+// Both live on `houses`, and a house_eras row may override tier (and
+// region) for its year, e.g. a house raised in rank, or one that moved.
+// Wardens aren't a section: they're Great Houses, listed first, with their
+// compass badge (from commanderTitles).
+//
+// getSectionKey is the single source of truth for "which section does this
+// house belong in this era", used both for the page's bucketing and for
+// each card's own styling, so the two can't drift apart. Royalty, exiled
+// and extinct span every tier; everything else goes by tier.
+const TIER_SECTION = {
+  great: 'great',
+  lordly: 'lordly',
+  knightly: 'knightly',
+  unknown: 'unknown',
+  order: 'order', // sworn orders: the Night's Watch
+  vassal: 'lordly', // the old tier, until the SQL update has run
 }
 
-// The chip text a card shows — derived, not stored. Diminished houses are
-// the one case where the actual DB value (status) is shown verbatim,
-// since that's exactly where the free text carries real information
-// ('Exiled' vs 'Restored' vs plain 'Diminished').
+function getSectionKey(house) {
+  const status = (house.status ?? '').toLowerCase()
+  if (status === 'royalty') return 'royalty'
+  if (status === 'extinct') return 'extinct'
+  if (status === 'exiled') return 'exiled'
+  return TIER_SECTION[house.tier] ?? 'unknown'
+}
+
+// Free-text statuses ('Diminished', 'Restored'): shown as the chip, in the
+// house's own tier section.
+function otherStatus(house) {
+  const status = (house.status ?? '').toLowerCase()
+  return status && !['active', 'royalty', 'exiled', 'extinct'].includes(status) ? house.status : null
+}
+
+function wardenTitle(house) {
+  return house.commanderTitles?.find((k) => k.startsWith('warden_of_')) ?? null
+}
+
+// A house's standing in one era, as words: shown for each era in the house
+// window's "Across the Ages" timeline. Derived, not stored.
 function getBadgeText(house, sectionKey) {
   if (sectionKey === 'royalty') return 'Royalty'
   if (sectionKey === 'extinct') return 'Extinct'
-  if (sectionKey === 'diminished') return house.status
-  if (sectionKey === 'vassal') return 'Vassal'
-  if (sectionKey === 'wardens') {
-    const key = house.commanderTitles.find((k) => k.startsWith('warden_of_'))
-    return TITLE_META[key]?.label ?? 'Warden'
+  if (sectionKey === 'exiled') return 'Exiled'
+  const other = otherStatus(house)
+  if (other) return other
+  if (sectionKey === 'great') {
+    const key = wardenTitle(house)
+    return key ? TITLE_META[key]?.label ?? 'Warden' : 'Great House'
   }
-  return 'Great House' // sectionKey === 'active'
+  if (sectionKey === 'lordly') return 'Lordly'
+  if (sectionKey === 'knightly') return 'Knightly'
+  if (sectionKey === 'order') return 'Sworn Order'
+  return 'Rank Unknown'
 }
 
-// Styling per section — muting only applies to diminished/extinct; royalty
-// gets its gold tint (applied via `body` in HouseCard/HouseModal); every
-// other section (wardens/active/vassal) renders as an ordinary card.
+// Styling per section: royalty gets its gold tint (applied via `body` in
+// HouseCard/HouseModal); exiled and extinct are muted; every other section
+// renders as an ordinary card.
 const SECTION_STYLE = {
   royalty: {
     card: 'border-stone-800 hover:border-got-gold/40',
     image: '',
     body: 'bg-gradient-to-b from-got-gold/10 via-got-gold/5 to-transparent',
   },
-  // Purple regardless of which flavor of diminished this is — the chip
-  // text (Exiled/Restored/Diminished) is what still distinguishes them.
-  diminished: { card: 'border-purple-900/60 opacity-90', image: '' },
+  exiled: { card: 'border-purple-900/60 opacity-90', image: '' },
   extinct: { card: 'border-stone-800 opacity-45 grayscale', image: 'grayscale' },
-}
-const FALLEN_SECTIONS = new Set(['diminished', 'extinct'])
-
-// Chip color per *displayed* badge text rather than a stored label — falls
-// back to a neutral tone for anything not explicitly listed (a new
-// diminished-flavor word you start using, say).
-const LABEL_TONE = {
-  Royalty: 'text-got-gold border-got-gold/50 bg-got-gold/10',
-  'Great House': 'text-got-parchment/70 border-stone-700 bg-stone-900/60',
-  Vassal: 'text-got-parchment/70 border-stone-700 bg-stone-900/60',
-  Restored: 'text-amber-300/90 border-amber-600/50 bg-amber-950/40',
-  Diminished: 'text-amber-400/90 border-amber-700/50 bg-amber-950/40',
-  Exiled: 'text-purple-300/80 border-purple-700/40 bg-purple-950/30',
-  Extinct: 'text-got-red-bright/80 border-got-red-bright/30 bg-black/40',
-}
-const WARDEN_TONE = 'text-slate-300/85 border-slate-500/40 bg-slate-900/40'
-const DEFAULT_TONE = 'text-got-parchment/60 border-stone-700 bg-stone-900/60'
-
-function toneFor(badgeText) {
-  if (badgeText?.startsWith('Warden of')) return WARDEN_TONE
-  return LABEL_TONE[badgeText] ?? DEFAULT_TONE
 }
 
 // Grid order within a section: Protector/King-in-the-North first, then the
@@ -112,14 +112,6 @@ function housePriority(house) {
 // large size in the modal.
 const SHIELD_RADIUS = '6px 6px 46% 46% / 6px 6px 62% 62%'
 
-// Crenellated-banner badge shape, shared by every commander title — a
-// single path, castle-top silhouette tapering to a pennant point. Icon and
-// color swap inside it per title; the shape itself never changes.
-const BADGE_SHAPE_PATH =
-  'M4,40 L4,12 L8,12 L8,4 L14,4 L14,12 L18,12 L18,4 L24,4 L24,12 L28,12 L28,4 L34,4 L34,12 L36,12 L36,40 L20,56 Z'
-const CROWN_ICON_PATH = 'M12,32 L12,23 L16,27 L20,20 L24,27 L28,23 L28,32 Z'
-const COMPASS_ICON_PATH = 'M20,17 L22.5,25 L29,27 L22.5,29 L20,37 L17.5,29 L11,27 L17.5,25 Z'
-
 const GOLD = '#c9a75a' // matches got-gold — Protector of the Realm
 const SILVER = '#a9b4bd' // uniform steel tone — all four Wardens
 
@@ -134,35 +126,6 @@ const TITLE_META = {
   warden_of_the_south: { label: 'Warden of the South', icon: 'compass', direction: 'S', color: SILVER },
   warden_of_the_east: { label: 'Warden of the East', icon: 'compass', direction: 'E', color: SILVER },
   warden_of_the_west: { label: 'Warden of the West', icon: 'compass', direction: 'W', color: SILVER },
-}
-
-function CommanderBadge({ titleKey, size = 26, showLabel = false }) {
-  const meta = TITLE_META[titleKey]
-  if (!meta) return null
-  return (
-    <div className="flex flex-col items-center gap-1" title={meta.label}>
-      <svg width={size} height={size * 1.4} viewBox="0 0 40 56" style={{ filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.5))' }}>
-        <path d={BADGE_SHAPE_PATH} fill={meta.color} />
-        {meta.icon === 'crown' && <path d={CROWN_ICON_PATH} fill="#1a1610" />}
-        {meta.icon === 'compass' && (
-          <>
-            <path d={COMPASS_ICON_PATH} fill="#1a1610" />
-            <text x="20" y="46" textAnchor="middle" fontSize="9" fontWeight="700" fill="#1a1610" fontFamily="Cinzel, serif">
-              {meta.direction}
-            </text>
-          </>
-        )}
-      </svg>
-      {showLabel && (
-        <span
-          className="text-[9px] uppercase tracking-widest text-got-parchment/50 text-center leading-tight"
-          style={{ fontFamily: 'Cinzel, serif' }}
-        >
-          {meta.label}
-        </span>
-      )}
-    </div>
-  )
 }
 
 // Priority for the headline "who's in charge" stat: a regent or castellan
@@ -212,74 +175,157 @@ function Sigil({ house, size, statusStyle }) {
   )
 }
 
-function HouseCard({ house, isSelected, onClick }) {
-  const sectionKey = getSectionKey(house)
-  const statusStyle = SECTION_STYLE[sectionKey] ?? null
-  const badgeText = getBadgeText(house, sectionKey)
-  const tone = toneFor(badgeText)
-  const authority = computeAuthority(house)
-  const seatText = house.seats && house.seats.length > 0 ? house.seats[0] : null
-  const gradient = `linear-gradient(150deg, ${house.tinctFrom ?? '#241f14'} 0%, ${house.tinctTo ?? '#0b0a08'} 82%)`
-  const { prefix, name } = splitHouseName(house.name)
+/* ---------------- the page's look ---------------- */
 
+const CINZEL = { fontFamily: "'Cinzel', serif" }
+const GARAMOND = { fontFamily: "'EB Garamond', Georgia, serif" }
+const FOCUS = 'focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-[#d8b878]'
+const INK = { cream: '#f1e6cc', gold: '#d8b878', muted: '#8f8676', words: '#c9b27a', noWords: '#8a5a4e' }
+
+// A hanging banner with a pointed foot (the same shape as the home page's
+// Explore banners), in the house's colour, its sigil on it, edged in gold.
+const BANNER_CLIP = 'polygon(0 0, 100% 0, 100% 84%, 50% 100%, 0 84%)'
+
+function HouseBanner({ house, width }) {
+  const height = Math.round(width * 1.3)
+  const tint = house.tinctFrom ?? '#3a342a'
+  const initial = (splitHouseName(house.name).name ?? '?')[0]
   return (
-    <motion.button
-      layout
-      onClick={onClick}
-      whileHover={{ y: -4 }}
-      whileTap={{ scale: 0.98 }}
-      className={[
-        'relative text-left rounded-lg border overflow-hidden bg-got-charcoal transition-all duration-200',
-        isSelected ? 'border-got-gold' : statusStyle ? statusStyle.card : 'border-stone-800 hover:border-got-gold/40',
-        sectionKey === 'royalty' ? 'col-span-2 sm:col-span-1' : '',
-      ].join(' ')}
-    >
-      <div className="relative flex items-center justify-center p-6" style={{ background: gradient }}>
-        <Sigil house={house} size={60} statusStyle={statusStyle} />
-        {house.commanderTitles && house.commanderTitles.length > 0 && (
-          <div className="absolute top-2 left-2 flex gap-1">
-            {house.commanderTitles.map((key) => (
-              <CommanderBadge key={key} titleKey={key} size={16} />
-            ))}
-          </div>
-        )}
-        <span
-          className={['absolute top-2 right-2 text-[9px] tracking-widest uppercase border rounded px-1.5 py-0.5', tone].join(' ')}
-          style={{ fontFamily: 'Cinzel, serif' }}
-        >
-          {badgeText}
-        </span>
-      </div>
-
-      <div className={['p-3', statusStyle?.body].filter(Boolean).join(' ')}>
-        {prefix && (
-          <p className="text-[9px] tracking-[0.25em] uppercase text-got-parchment/35" style={{ fontFamily: 'Cinzel, serif' }}>
-            {prefix}
-          </p>
-        )}
-        <h4 className="text-base font-bold text-got-parchment -mt-0.5" style={{ fontFamily: 'Cinzel, serif' }}>
-          {name}
-        </h4>
-        {(house.region || seatText) && (
-          <p
-            className="hidden lg:block text-[9px] tracking-[0.2em] uppercase text-got-parchment/40 mt-1"
-            style={{ fontFamily: 'Cinzel, serif' }}
-          >
-            {[house.region, seatText].filter(Boolean).join(' · ')}
-          </p>
-        )}
-        <div className="h-px bg-gradient-to-r from-stone-700 to-transparent my-3" />
-        {house.words ? (
-          <p className="text-sm max-[426px]:text-[11px] italic text-got-gold/70" style={{ fontFamily: 'EB Garamond, serif' }}>
-            &ldquo;{house.words}&rdquo;
-          </p>
+    <div className="relative shrink-0" style={{ width, height, clipPath: BANNER_CLIP, background: 'rgba(216,184,120,.6)' }} aria-hidden="true">
+      <div
+        className="absolute flex items-center justify-center"
+        style={{
+          inset: width > 30 ? 1.5 : 1,
+          clipPath: BANNER_CLIP,
+          background: `linear-gradient(160deg, ${tint}, ${tint}bb 55%, #0c0b0a)`,
+          paddingBottom: height * 0.14,
+        }}
+      >
+        {house.imageUrl ? (
+          <img src={house.imageUrl} alt="" className="object-contain" style={{ width: '84%', height: '74%' }} />
         ) : (
-          <p className="text-xs max-[426px]:text-[11px] italic text-got-red-bright/50" style={{ fontFamily: 'EB Garamond, serif' }}>
-            No recorded words
-          </p>
+          <span style={{ ...CINZEL, fontSize: width * 0.42, color: INK.cream }}>{initial}</span>
         )}
       </div>
-    </motion.button>
+    </div>
+  )
+}
+
+// "The North · Winterfell"
+const placeOf = (house) => [house.region, house.seats?.[0]].filter(Boolean).join(' · ')
+
+function Words({ house, faded, className = '' }) {
+  return (
+    <div className={`italic ${className}`} style={{ ...GARAMOND, color: house.words ? (faded ? INK.muted : INK.words) : INK.noWords }}>
+      {house.words ? `\u201c${house.words}\u201d` : 'No recorded words'}
+    </div>
+  )
+}
+
+function WardenTag({ house, className = '' }) {
+  const key = wardenTitle(house)
+  if (!key) return null
+  return (
+    <span className={`uppercase ${className}`} title={TITLE_META[key]?.label} style={{ ...CINZEL, fontSize: 8, letterSpacing: '.2em', color: INK.gold }}>
+      Warden
+    </span>
+  )
+}
+
+// Extinct houses are shown faded and grey.
+const fadedStyle = (sectionKey) => (sectionKey === 'extinct' ? { opacity: 0.55, filter: 'grayscale(1)' } : null)
+
+// Banners view: a card per house.
+function HouseTile({ house, sectionKey, isSelected, onClick }) {
+  const tint = house.tinctFrom ?? '#3a342a'
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`relative w-full text-left flex items-center gap-3.5 min-h-[76px] px-3.5 py-3 rounded-[3px] border transition-colors duration-200 cursor-pointer ${
+        isSelected ? 'border-[#d8b878]' : 'border-[rgba(216,184,120,.11)] hover:border-[rgba(216,184,120,.5)]'
+      } ${FOCUS}`}
+      style={{ background: `linear-gradient(100deg, ${tint}55 0%, ${tint}18 38%, rgba(255,255,255,.012) 70%)`, ...fadedStyle(sectionKey) }}
+    >
+      <HouseBanner house={house} width={40} />
+      <div className="min-w-0 flex-1">
+        <div className="truncate pr-12" style={{ ...CINZEL, fontWeight: 600, fontSize: 15, letterSpacing: '.03em', color: INK.cream }}>
+          {splitHouseName(house.name).name}
+        </div>
+        <div className="truncate uppercase mt-[3px]" style={{ ...CINZEL, fontSize: 9, letterSpacing: '.18em', color: INK.muted }}>
+          {placeOf(house)}
+        </div>
+        <Words house={house} faded={sectionKey === 'extinct'} className="truncate mt-[3px] text-[15px]" />
+      </div>
+      <WardenTag house={house} className="absolute top-2 right-2.5" />
+    </button>
+  )
+}
+
+// Roll view: a line per house; place and words hide on narrow screens.
+function HouseRollRow({ house, sectionKey, isSelected, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full text-left grid items-center gap-x-[18px] gap-y-1 px-1.5 py-2 border-b border-[rgba(216,184,120,.08)] transition-colors cursor-pointer grid-cols-[24px_minmax(0,1fr)] min-[820px]:grid-cols-[24px_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.5fr)] ${
+        isSelected ? 'bg-[rgba(216,184,120,.09)]' : 'hover:bg-[rgba(216,184,120,.05)]'
+      } ${FOCUS}`}
+      style={fadedStyle(sectionKey)}
+    >
+      <HouseBanner house={house} width={24} />
+      <div className="flex items-baseline gap-2.5 min-w-0">
+        <span className="truncate" style={{ ...CINZEL, fontWeight: 600, fontSize: 14, color: INK.cream }}>
+          {splitHouseName(house.name).name}
+        </span>
+        <WardenTag house={house} />
+      </div>
+      <span className="hidden min-[820px]:block truncate uppercase" style={{ ...CINZEL, fontSize: 9.5, letterSpacing: '.18em', color: INK.muted }}>
+        {placeOf(house)}
+      </span>
+      <Words house={house} faded={sectionKey === 'extinct'} className="hidden min-[820px]:block truncate text-[15px]" />
+    </button>
+  )
+}
+
+// Royalty and Orders: a house beside its council, in one framed block.
+function CrownLabel({ house }) {
+  const crown = house.commanderTitles?.find((k) => k === 'king_in_the_north' || k === 'queen_in_the_north')
+  return crown ? TITLE_META[crown].label : 'The Iron Throne'
+}
+
+function FeatureBlock({ house, label, council, seats, isSelected, onClick, dark }) {
+  const tint = house.tinctFrom ?? '#3a342a'
+  return (
+    <div
+      className={`flex flex-wrap rounded-[3px] overflow-hidden border ${isSelected ? 'border-[#d8b878]' : 'border-[rgba(216,184,120,.2)]'}`}
+      style={{ background: dark ? 'linear-gradient(90deg, rgba(0,0,0,.35), rgba(255,255,255,.01) 40%)' : 'rgba(255,255,255,.015)' }}
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        className={`relative flex items-center gap-[18px] px-[22px] py-5 text-left cursor-pointer ${FOCUS}`}
+        style={{ flex: '1 1 280px', background: dark ? undefined : `linear-gradient(100deg, ${tint}55 0%, ${tint}18 45%, transparent 80%)` }}
+      >
+        <HouseBanner house={house} width={dark ? 44 : 58} />
+        <div className="min-w-0">
+          {label && (
+            <div className="flex items-center gap-2 uppercase" style={{ ...CINZEL, fontSize: 9.5, letterSpacing: '.3em', color: INK.gold }}>
+              <span className="w-1.5 h-1.5 rotate-45 shrink-0" style={{ background: INK.gold }} />
+              <span>{label}</span>
+            </div>
+          )}
+          <div className={label ? 'mt-1.5' : ''} style={{ ...CINZEL, fontWeight: 600, fontSize: dark ? 17 : 20, lineHeight: 1.15, color: INK.cream }}>
+            {house.name}
+          </div>
+          <div className="uppercase mt-1.5" style={{ ...CINZEL, fontSize: 9.5, letterSpacing: '.2em', color: INK.muted }}>
+            {placeOf(house)}
+          </div>
+          <Words house={house} className="mt-1.5 text-[16px]" />
+        </div>
+      </button>
+      {council && <CouncilPanel council={council} seats={seats} />}
+    </div>
   )
 }
 
@@ -333,7 +379,7 @@ function MiniTimeline({ points, houseEras, currentYear, tier, onSelect }) {
         const authority = computeAuthority(era)
         const isCurrent = p.year === currentYear
         const isLast = i === points.length - 1
-        const badgeText = era ? getBadgeText({ ...era, tier }, getSectionKey({ ...era, tier })) : '—'
+        const badgeText = era ? getBadgeText({ tier, ...era }, getSectionKey({ tier, ...era })) : '—'
         return (
           <button key={p.year} onClick={() => onSelect(p.year)} className="flex gap-4 text-left w-full">
             <div className="flex flex-col items-center w-2.5 shrink-0">
@@ -383,8 +429,13 @@ function HouseModal({ house, houseEras, onClose, onYearSelect }) {
   const titles = activeBranch ? activeBranch.titles?.join(', ') : house.titles?.join(', ')
   const heir = activeBranch ? activeBranch.heir : house.heir
 
-  const authority = activeBranch
-    ? { label: 'Ruling Lord', value: activeBranch.lord, caption: null }
+  // A branch names its own leader, under its own title if it has one
+  // ('Commander' at Eastwatch). The main branch (the first tab) may leave its
+  // lord empty, and then shows the era's own ruler, so that isn't recorded
+  // twice (the Night's Watch's Lord Commander at Castle Black).
+  const branchLeadsItself = activeBranch && !(activeBranchIndex === 0 && activeBranch.lord == null)
+  const authority = branchLeadsItself
+    ? { label: activeBranch.rulerLabel ?? 'Ruling Lord', value: activeBranch.lord, caption: null }
     : computeAuthority(house)
 
   const gradient = `linear-gradient(165deg, ${house.tinctFrom ?? '#241f14'} 0%, ${house.tinctTo ?? '#0b0a08'} 85%)`
@@ -526,7 +577,9 @@ function HouseModal({ house, houseEras, onClose, onYearSelect }) {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 sm:gap-x-8 gap-y-4 sm:gap-y-5 mt-6">
-            <FieldCell label={house.heirLabel || 'Heir'} value={heir} />
+            {/* A sworn order (the Night's Watch) has no heirs: its brothers
+                take no wives and father no children. */}
+            {house.tier !== 'order' && <FieldCell label={house.heirLabel || 'Heir'} value={heir} />}
             <FieldCell label="Seat" value={seat} />
             <FieldCell label="Sworn To" value={house.overlord} />
             <FieldCell label="Founded" value={house.founded} caption={house.founder ? `by ${house.founder}` : null} />
@@ -571,148 +624,113 @@ function HouseModal({ house, houseEras, onClose, onYearSelect }) {
   )
 }
 
-// One kingdom this era (298, before the split) → a plain label, nothing to
-// click. More than one (305, once the North secedes) → tabs, each filtering
-// the grid to just that kingdom's houses. Scales to a third kingdom later
-// without changing this component, only KINGDOM_ORDER and the data.
-function KingdomNav({ kingdoms, current, onSelect }) {
-  if (kingdoms.length === 0) return null
-
-  if (kingdoms.length === 1) {
-    return (
-      <p
-        className="text-center text-xs sm:text-sm tracking-[0.3em] uppercase text-got-parchment/50"
-        style={{ fontFamily: 'Cinzel, serif' }}
-      >
-        {kingdoms[0]}
-      </p>
-    )
-  }
-
-  return (
-    <div className="flex items-center justify-center gap-2 sm:gap-3">
-      {kingdoms.map((k) => (
-        <button
-          key={k}
-          onClick={() => onSelect(k)}
-          className={[
-            'py-1.5 px-3 sm:py-2 sm:px-5 rounded border text-xs sm:text-sm tracking-widest uppercase transition-colors',
-            k === current
-              ? 'border-got-gold bg-got-gold/10 text-got-gold'
-              : 'border-stone-700 text-got-parchment/50 hover:border-got-gold/30 hover:text-got-parchment/80',
-          ].join(' ')}
-          style={{ fontFamily: 'Cinzel, serif' }}
-        >
-          {k}
-        </button>
-      ))}
-    </div>
-  )
+// The councils shown beside a house's card. Seats are listed in a fixed
+// order, independent of the order rows were inserted in; a seat with no
+// row for the selected year shows "Unknown", so a panel keeps its shape
+// across eras. `listRole` is a seat with several members, shown as a row
+// of names under the grid, the first starred (the Kingsguard's Lord
+// Commander).
+//
+// Rows live in the small_council table; its `council` column says which
+// council a row belongs to ('small_council' or 'nights_watch').
+//
+// Small Council: King/Consort left out (the Royalty card already shows
+// them); Commander/Champion left out (never confident data in any era).
+const COUNCILS = {
+  small_council: {
+    title: 'Small Council',
+    roles: ['hand', 'grand_maester', 'master_of_coin', 'master_of_laws', 'master_of_ships', 'master_of_whispers'],
+    labels: {
+      hand: 'Hand of the King',
+      grand_maester: 'Grand Maester',
+      master_of_coin: 'Master of Coin',
+      master_of_laws: 'Master of Laws',
+      master_of_ships: 'Master of Ships',
+      master_of_whispers: 'Master of Whispers',
+      kingsguard: 'Kingsguard',
+    },
+    listRole: 'kingsguard',
+    listLeader: 'Lord Commander',
+    countWord: 'seated',
+  },
+  nights_watch: {
+    // Castle Black's officers. The commanders of Eastwatch and the Shadow
+    // Tower are the Watch's other branches, shown in the house window.
+    title: 'Officers of Castle Black',
+    countWord: 'known',
+    roles: ['lord_commander', 'first_ranger', 'first_builder', 'first_steward', 'maester'],
+    labels: {
+      lord_commander: 'Lord Commander',
+      first_ranger: 'First Ranger',
+      first_builder: 'First Builder',
+      first_steward: 'First Steward',
+      maester: 'Maester of Castle Black',
+    },
+  },
 }
 
-// Fixed display order for council seats — independent of whatever order
-// rows happen to be inserted in. A role with no row for the selected year
-// (most of them, for 305, since a lot is genuinely unconfirmed) just
-// doesn't render rather than showing an empty slot.
-// King/Consort dropped — that's the same info the Royalty card already
-// shows. Commander/Champion dropped too — never had confident data for
-// either across any era. Master of Ships added now that it has a slot.
-const ROLE_ORDER = [
-  'hand',
-  'grand_maester',
-  'master_of_coin',
-  'master_of_laws',
-  'master_of_ships',
-  'master_of_whispers',
-  'kingsguard',
-]
-const ROLE_LABEL = {
-  hand: 'Hand of the King',
-  grand_maester: 'Grand Maester',
-  master_of_coin: 'Master of Coin',
-  master_of_laws: 'Master of Laws',
-  master_of_ships: 'Master of Ships',
-  master_of_whispers: 'Master of Whispers',
-  kingsguard: 'Kingsguard',
-}
+// The house whose card the Night's Watch officers sit beside.
+const NIGHTS_WATCH_SLUG = 'nights-watch'
 
-function CouncilPanel({ seats, ruler }) {
-  const [expanded, setExpanded] = useState(false)
+function CouncilPanel({ council, seats }) {
+  // Below md the council folds away behind its heading, closed at first;
+  // from md up it's always open and the heading is just a heading.
+  const [open, setOpen] = useState(false)
   if (!seats || seats.length === 0) return null
-
-  // Kingsguard (or any future multi-member role) gets its own row below
-  // the grid, matching the mockup — everything else is a single name per
-  // seat and fits the 3-column grid fine.
-  const kingsguard = seats.find((s) => s.role === 'kingsguard')
-  const otherSeats = seats.filter((s) => s.role !== 'kingsguard')
-  const totalMembers = seats.reduce((sum, s) => sum + s.members.length, 0)
+  // The multi-member seat (Kingsguard) gets its own row below the grid.
+  const listSeat = council.listRole ? seats.find((s) => s.role === council.listRole) : null
+  const otherSeats = seats.filter((s) => s.role !== council.listRole)
+  const total = seats.reduce((sum, s) => sum + s.members.length, 0)
 
   return (
-    <div className="col-span-2 sm:col-span-3 rounded-lg border border-stone-800 bg-got-charcoal py-3 px-6 sm:py-4 px-6">
-      {/* Clickable only matters on mobile — sm:cursor-default and the
-          chevron being sm:hidden both signal that above the breakpoint
-          this is just a heading, not a toggle. The content below is
-          forced visible from sm up regardless of `expanded`. */}
-      <button type="button" onClick={() => setExpanded((v) => !v)} className="w-full text-center sm:cursor-default">
-        <div className="flex items-center justify-center gap-2">
-          <p
-            className="text-xs sm:text-sm tracking-[0.3em] uppercase text-got-gold/70"
-            style={{ fontFamily: 'Cinzel, serif' }}
-          >
-            Small Council{totalMembers ? ` · ${totalMembers}` : ''}
-          </p>
-          <span
-            className={['sm:hidden text-got-gold/60 text-[10px] transition-transform', expanded ? 'rotate-180' : ''].join(' ')}
-          >
-            ▾
+    <div
+      className="flex flex-col gap-3.5 px-[22px] py-[18px] border-t border-[rgba(216,184,120,.12)] min-[860px]:border-t-0 min-[860px]:border-l"
+      style={{ flex: '3 1 520px' }}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={`flex items-center justify-between gap-3 text-left cursor-pointer md:cursor-default ${FOCUS}`}
+      >
+        <span className="uppercase" style={{ ...CINZEL, fontSize: 10, letterSpacing: '.34em', color: INK.gold }}>
+          {council.title}
+        </span>
+        <span className="flex items-center gap-3 shrink-0">
+          <span className="whitespace-nowrap" style={{ ...CINZEL, fontSize: 10, letterSpacing: '.2em', color: INK.muted }}>
+            {total} {council.countWord}
           </span>
-        </div>
+          <svg width="10" height="6" viewBox="0 0 10 6" aria-hidden="true" className={`md:hidden transition-transform ${open ? 'rotate-180' : ''}`}>
+            <path d="M.5.5 5 5 9.5.5" fill="none" stroke={INK.gold} />
+          </svg>
+        </span>
       </button>
-
-      <div className={[expanded ? 'block' : 'hidden', 'sm:block'].join(' ')}>
-        <div className="grid grid-cols-1 mt-4 sm:grid-cols-3 gap-x-5 sm:gap-x-8 gap-y-4 sm:gap-y-5">
-          {otherSeats.map(({ role, members }) => (
-            <div key={role} className="border-b border-stone-800/70 pb-4">
-              <div className="flex items-center gap-2">
-                <span className={members.length > 0 ? 'text-got-gold text-xs' : 'text-got-gold/30 text-xs'}>
-                  {members.length > 0 ? '◆' : '◇'}
-                </span>
-                <span
-                  className="text-[10px] tracking-[0.22em] uppercase text-got-parchment/40"
-                  style={{ fontFamily: 'Cinzel, serif' }}
-                >
-                  {ROLE_LABEL[role] ?? role}
-                </span>
+      <div className={`${open ? 'grid' : 'hidden'} md:grid gap-x-5 gap-y-3`} style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
+        {otherSeats.map(({ role, members }) => {
+          const known = members.length > 0
+          return (
+            <div key={role} className="flex flex-col gap-[3px] min-w-0">
+              <div className="flex items-center gap-[7px] uppercase" style={{ ...CINZEL, fontSize: 9, letterSpacing: '.2em', color: INK.muted }}>
+                <span className="shrink-0 w-[5px] h-[5px] rotate-45 border" style={{ borderColor: INK.gold, background: known ? INK.gold : 'transparent' }} />
+                <span>{council.labels[role] ?? role}</span>
               </div>
-              {members.length > 0 ? (
-                <p className="text-sm text-got-parchment mt-1.5 leading-tight" style={{ fontFamily: 'EB Garamond, serif' }}>
-                  {members.map((m) => m.characterName).join(', ')}
-                </p>
-              ) : (
-                <p className="text-sm italic text-got-parchment/30 mt-1.5" style={{ fontFamily: 'EB Garamond, serif' }}>
-                  Unknown
-                </p>
-              )}
+              <span className={`pl-3 text-[16px] ${known ? '' : 'italic'}`} style={{ ...GARAMOND, color: known ? '#ece5d6' : '#7d7566' }}>
+                {known ? members.map((m) => m.characterName).join(', ') : 'Unknown'}
+              </span>
             </div>
-          ))}
-        </div>
-
-        <div className="pt-3 flex flex-wrap items-baseline gap-x-6 gap-y-2">
-          <span
-            className="text-[10px] tracking-[0.22em] uppercase text-got-parchment/40 shrink-0"
-            style={{ fontFamily: 'Cinzel, serif' }}
-          >
-            {ROLE_LABEL.kingsguard}
+          )
+        })}
+      </div>
+      {council.listRole && (
+        <div className={`${open ? 'flex' : 'hidden'} md:flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-3 border-t border-[rgba(216,184,120,.1)]`}>
+          <span className="uppercase" style={{ ...CINZEL, fontSize: 9, letterSpacing: '.26em', color: INK.muted }}>
+            {council.labels[council.listRole]}
           </span>
-          {kingsguard && kingsguard.members.length > 0 ? (
-            kingsguard.members.map((m, i) => (
-              <span
-                key={m.characterName}
-                className="flex items-center gap-1.5 text-sm text-got-parchment border-b border-stone-700 pb-0.5"
-                style={{ fontFamily: 'EB Garamond, serif' }}
-              >
+          {listSeat && listSeat.members.length > 0 ? (
+            listSeat.members.map((m, i) => (
+              <span key={m.characterName} className="flex items-center gap-[5px] text-[15px]" style={{ ...GARAMOND, color: '#d3c8b2' }}>
                 {i === 0 && (
-                  <span className="text-got-gold text-xs" title="Lord Commander">
+                  <span className="text-[12px]" style={{ color: INK.gold }} title={council.listLeader}>
                     ★
                   </span>
                 )}
@@ -720,41 +738,131 @@ function CouncilPanel({ seats, ruler }) {
               </span>
             ))
           ) : (
-            <span className="text-sm italic text-got-parchment/30" style={{ fontFamily: 'EB Garamond, serif' }}>
+            <span className="text-[15px] italic" style={{ ...GARAMOND, color: '#7d7566' }}>
               Unknown
             </span>
           )}
         </div>
-      </div>
+      )}
     </div>
   )
 }
 
-// Four tiers, top to bottom. Vassals are deliberately left out for now —
-// they need real house rows decided first. Skipping a tier with no
-// members this era (e.g. no "Dead" section at 298) is handled where
-// SECTIONS is consumed, not here.
+// Top to bottom. A section with no houses this era (no Extinct Houses at
+// 298, say) is skipped where SECTIONS is consumed, not here.
 const SECTIONS = [
   { key: 'royalty', label: 'Royalty' },
-  { key: 'wardens', label: 'Wardens' },
-  { key: 'active', label: 'Great Houses' },
-  { key: 'diminished', label: 'Diminished' },
-  { key: 'vassal', label: 'Vassals' },
-  { key: 'extinct', label: 'Dead' },
+  { key: 'great', label: 'Great Houses' },
+  { key: 'lordly', label: 'Lordly Houses' },
+  { key: 'knightly', label: 'Knightly Houses' },
+  { key: 'unknown', label: 'Other Houses', note: 'Noble rank unknown' },
+  { key: 'exiled', label: 'Exiled Houses' },
+  { key: 'extinct', label: 'Extinct Houses' },
+  { key: 'order', label: 'Orders' },
 ]
 
-function SectionHeading({ label, count }) {
+function SectionHeading({ label, note, count }) {
   return (
-    <div className="flex items-center gap-2 sm:gap-3 mb-4">
-      <span className="text-xs sm:text-sm tracking-[0.2em] sm:tracking-[0.3em] uppercase text-got-gold/80" style={{ fontFamily: 'Cinzel, serif' }}>
+    <div className="flex items-center gap-4 mb-3">
+      <span className="uppercase whitespace-nowrap" style={{ ...CINZEL, fontSize: 11, letterSpacing: '.34em', color: INK.gold }}>
         {label}
       </span>
-      <div className="flex-1 h-px bg-gradient-to-r from-stone-700 to-transparent" />
-      <span className="text-xs text-stone-600" style={{ fontFamily: 'Cinzel, serif' }}>
-        {count}
-      </span>
+      {note && (
+        <span className="italic whitespace-nowrap text-[15px]" style={{ ...GARAMOND, color: INK.muted }}>
+          {note}
+        </span>
+      )}
+      <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(216,184,120,.3), rgba(216,184,120,.04))' }} />
+      <span style={{ ...CINZEL, fontSize: 11, color: INK.muted }}>{count}</span>
     </div>
   )
+}
+
+// A segmented control: realm tabs at 305, and Banners / Roll.
+function Segmented({ options, value, onChange, size = 11, height }) {
+  return (
+    <div className="flex gap-[3px] p-[3px] rounded-[2px] border border-[rgba(216,184,120,.3)]" style={{ height }} role="radiogroup">
+      {options.map(({ value: v, label }) => {
+        const on = v === value
+        return (
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onChange(v)}
+            className={`uppercase px-3.5 rounded-[1px] cursor-pointer transition-colors ${height ? '' : 'py-[9px]'} ${FOCUS}`}
+            style={{ ...CINZEL, fontSize: size, letterSpacing: '.16em', background: on ? 'rgba(216,184,120,.16)' : 'transparent', color: on ? '#eed49b' : '#9d9483' }}
+          >
+            {label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// The era picker: years on a gold line, the chosen one lit.
+function EraPicker({ points, selectedYear, onSelect }) {
+  return (
+    <div className="relative flex" role="radiogroup" aria-label="Era">
+      <div
+        className="absolute left-[16%] right-[16%] bottom-[9px] h-px"
+        style={{ background: 'linear-gradient(90deg, rgba(216,184,120,.1), rgba(216,184,120,.4), rgba(216,184,120,.1))' }}
+      />
+      {points.map((p) => {
+        const on = p.year === selectedYear
+        return (
+          <button
+            key={p.year}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onSelect(p.year)}
+            className={`relative flex flex-col items-center gap-2.5 w-[92px] sm:w-[108px] cursor-pointer ${FOCUS}`}
+          >
+            <span style={{ ...CINZEL, fontWeight: 500, fontSize: 22, letterSpacing: '.02em', color: on ? '#e2bc5c' : '#7d7566' }}>{p.label}</span>
+            <span
+              className="rotate-45 border border-[rgba(216,184,120,.55)]"
+              style={{ width: on ? 12 : 8, height: on ? 12 : 8, margin: on ? 0 : '2px 0', background: on ? '#e2bc5c' : '#1f1d1a' }}
+            />
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+const VIEW_KEY = 'houses-view'
+function useRememberedView() {
+  const [view, setView] = useState(() => {
+    try {
+      return localStorage.getItem(VIEW_KEY) === 'roll' ? 'roll' : 'banners'
+    } catch {
+      return 'banners'
+    }
+  })
+  const choose = (v) => {
+    setView(v)
+    try {
+      localStorage.setItem(VIEW_KEY, v)
+    } catch {
+      // private browsing: the choice just isn't remembered
+    }
+  }
+  return [view, choose]
+}
+
+// Short names for the jump links under the toolbar.
+const JUMP_LABEL = {
+  royalty: 'Royalty',
+  great: 'Great',
+  lordly: 'Lordly',
+  knightly: 'Knightly',
+  unknown: 'Other',
+  exiled: 'Exiled',
+  extinct: 'Extinct',
+  order: 'Orders',
 }
 
 export default function Houses() {
@@ -766,7 +874,7 @@ export default function Houses() {
 
   // 298 is deliberately hardcoded rather than TIMELINE_POINTS[0].year — the
   // show starts there, and that should stay the default no matter where a
-  // new era (282, House of the Dragon eras, whatever) lands in the array.
+  // new era (281, House of the Dragon eras, whatever) lands in the array.
   const [selectedYear, setSelectedYear] = useState(298)
   const [selectedId, setSelectedId] = useState(null)
   const [search, setSearch] = useState('')
@@ -853,27 +961,28 @@ export default function Houses() {
       .sort((a, b) => housePriority(a) - housePriority(b) || a.name.localeCompare(b.name))
   }, [housesAtYear, effectiveKingdom, regionFilter, search])
 
-  const kingdomTotal = useMemo(
-    () => housesAtYear.filter((h) => h.kingdom === effectiveKingdom).length,
-    [housesAtYear, effectiveKingdom]
-  )
+  // "The Reign of King Robert Baratheon": the ruler of the kingdom being
+  // shown (at 305, Bran for the Six Kingdoms, Sansa for the North). Queen
+  // for a queen: a queen's crown title, or a ruler label saying so. A name
+  // that already starts with its title ("King Bran the Broken") keeps it.
+  const reign = useMemo(() => {
+    const royals = housesAtYear.filter((h) => h.status === 'royalty')
+    const royal = royals.find((h) => h.kingdom === effectiveKingdom) ?? royals[0]
+    if (!royal) return null
+    const name = computeAuthority(royal).value
+    if (!name) return null
+    const queen =
+      royal.commanderTitles?.includes('queen_in_the_north') || /queen/i.test(royal.rulerLabel ?? '')
+    const title = queen ? 'Queen' : 'King'
+    return /^(king|queen)\s/i.test(name) ? `The Reign of ${name}` : `The Reign of ${title} ${name}`
+  }, [housesAtYear, effectiveKingdom])
 
-  // Whoever holds the Iron Throne this era, regardless of which kingdom
-  // tab is currently selected — looked up from the raw, unfiltered eras
-  // rather than housesAtYear, since the North tab shouldn't make this
-  // disappear or change.
-  const currentRulerName = useMemo(() => {
-    const royalEra = eras.find((e) => e.year === selectedYear && e.status === 'royalty')
-    return royalEra ? computeAuthority(royalEra).value : null
-  }, [eras, selectedYear])
-
-  // filtered is already priority-sorted (Protector/Wardens first, etc.) —
-  // splitting it by status preserves that order within each bucket rather
-  // than needing a second sort. Anything with a status outside the known
-  // four (shouldn't happen, but data typos happen) falls back to "active"
-  // rather than silently vanishing from the grid.
+  // filtered is already priority-sorted (Protector and Wardens first) —
+  // splitting it into sections preserves that order within each one rather
+  // than needing a second sort. A house with an unknown tier value lands in
+  // Other Houses rather than silently vanishing from the grid.
   const sections = useMemo(() => {
-    const buckets = { royalty: [], wardens: [], active: [], diminished: [], extinct: [], vassal: [] }
+    const buckets = Object.fromEntries(SECTIONS.map(({ key }) => [key, []]))
     filtered.forEach((h) => {
       buckets[getSectionKey(h)].push(h)
     })
@@ -884,21 +993,22 @@ export default function Houses() {
   // kingsguard can have several, hence grouping rather than one row per
   // role. Roles with no row this year (most of them, at 305) just don't
   // appear, rather than the panel showing an empty slot.
+  // One entry per council: its seats for this year, in the council's fixed
+  // order, every seat present (an empty one renders as "Unknown").
   const councilSeats = useMemo(() => {
-    const byRole = new Map()
-    council
-      .filter((c) => c.year === selectedYear)
-      .forEach((c) => {
-        if (!byRole.has(c.role)) byRole.set(c.role, [])
-        byRole.get(c.role).push(c)
-      })
-    // Every seat always appears now, even with no data for this era — an
-    // empty members array renders as "Unknown" rather than the seat
-    // disappearing, so the panel's shape stays consistent across eras.
-    return ROLE_ORDER.map((role) => ({
-      role,
-      members: byRole.get(role) ?? [],
-    }))
+    const seatsFor = (key) => {
+      const def = COUNCILS[key]
+      const byRole = new Map()
+      council
+        .filter((c) => c.year === selectedYear && (c.council ?? 'small_council') === key)
+        .forEach((c) => {
+          if (!byRole.has(c.role)) byRole.set(c.role, [])
+          byRole.get(c.role).push(c)
+        })
+      const order = def.listRole ? [...def.roles, def.listRole] : def.roles
+      return order.map((role) => ({ role, members: byRole.get(role) ?? [] }))
+    }
+    return Object.fromEntries(Object.keys(COUNCILS).map((key) => [key, seatsFor(key)]))
   }, [council, selectedYear])
 
   // Static — doesn't change with the selected era or kingdom tab, only
@@ -911,101 +1021,176 @@ export default function Houses() {
     setSelectedId((current) => (current === house.id ? null : house.id))
   }
 
-  return (
-    <PageWrapper className="!py-0">
-      <div className="w-full max-w-6xl flex flex-col gap-8">
-        {/* Header */}
-        <PageHeading
-          className="pt-[26px] pb-5"
-          eyebrow="Game of Thrones"
-          title="Houses"
-          subtitle="The people of Westeros, and how well they fit each seat on the council."
-        />
+  const [view, setView] = useRememberedView()
+  const point = TIMELINE_POINTS.find((p) => p.year === selectedYear)
+  const ruledNorth = effectiveKingdom === 'Kingdom of the North'
+  const shownSections = SECTIONS.filter(({ key }) => sections[key]?.length > 0)
 
-        {!loading && !error && (
-          <>
-            <Timeline points={TIMELINE_POINTS} selectedYear={selectedYear} onSelect={setSelectedYear} rulerName={currentRulerName} />
-            <KingdomNav kingdoms={kingdoms} current={effectiveKingdom} onSelect={setKingdomFilter} />
-          </>
+  return (
+    <PageWrapper className="!p-0 !items-stretch">
+      <div className="w-full text-[#ece5d6]">
+        {/* Title, and the era picker */}
+        <header className="max-w-[1240px] mx-auto px-5 sm:px-7 pt-[18px] flex flex-wrap items-end justify-between gap-x-12 gap-y-6">
+          <div className="min-w-0">
+            <div className="uppercase" style={{ ...CINZEL, fontSize: 10, letterSpacing: '.46em', color: INK.muted }}>
+              Game of Thrones
+            </div>
+            <h1 className="mt-2 leading-none" style={{ ...CINZEL, fontWeight: 500, fontSize: 40, letterSpacing: '.1em', color: INK.cream }}>
+              Houses
+            </h1>
+          </div>
+          <EraPicker points={TIMELINE_POINTS} selectedYear={selectedYear} onSelect={setSelectedYear} />
+        </header>
+
+        {/* The era: who rules, and its realms */}
+        {!loading && !error && point && (
+          <section className="max-w-[1240px] mx-auto mt-[22px] px-5 sm:px-7">
+            <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4 py-4 border-y border-[rgba(216,184,120,.16)]">
+              <div className="flex flex-wrap items-baseline gap-x-[18px] gap-y-1.5 min-w-0" style={{ flex: '1 1 420px' }}>
+                <div className="flex flex-col gap-1">
+                  {point.season && (
+                    <span className="uppercase" style={{ ...CINZEL, fontSize: 9.5, letterSpacing: '.34em', color: INK.muted }}>
+                      {point.season}
+                    </span>
+                  )}
+                  <span style={{ ...CINZEL, fontWeight: 600, fontSize: 21, letterSpacing: '.04em', color: INK.cream }}>
+                    {reign || point.title}
+                  </span>
+                </div>
+              </div>
+              {kingdoms.length > 1 ? (
+                <Segmented
+                  options={kingdoms.map((k) => ({ value: k, label: k }))}
+                  value={effectiveKingdom}
+                  onChange={setKingdomFilter}
+                />
+              ) : (
+                kingdoms[0] && (
+                  <span className="uppercase" style={{ ...CINZEL, fontSize: 11, letterSpacing: '.34em', color: '#9d9483' }}>
+                    {kingdoms[0]}
+                  </span>
+                )
+              )}
+            </div>
+          </section>
         )}
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 border-t border-b border-stone-800/60 py-4 sm:py-5">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search houses, seats, words"
-            className="flex-[2_1_240px] min-w-0 py-2.5 px-3 sm:py-3 sm:px-4 rounded border border-stone-700 bg-got-charcoal/40 text-got-parchment text-sm placeholder:text-stone-600 focus:outline-none focus:border-got-gold/50"
-            style={{ fontFamily: 'EB Garamond, serif' }}
-          />
-          <select
-            value={regionFilter}
-            onChange={(e) => setRegionFilter(e.target.value)}
-            className="flex-1 min-w-[140px] py-2.5 px-3 sm:py-3 sm:px-4 rounded border border-stone-700 bg-got-charcoal/40 text-got-parchment text-xs tracking-widest uppercase focus:outline-none focus:border-got-gold/50"
-            style={{ fontFamily: 'Cinzel, serif' }}
-          >
-            {regions.map((r) => (
-              <option key={r} value={r}>
-                {r === 'all' ? 'All Regions' : r}
-              </option>
-            ))}
-          </select>
+        {/* Search, region and view, with links to each section; stays at the top while scrolling */}
+        <div className="sticky top-0 z-[5] mt-3 border-b border-[rgba(216,184,120,.1)] backdrop-blur-md" style={{ background: 'rgba(31,29,26,.94)' }}>
+          <div className="max-w-[1240px] mx-auto px-5 sm:px-7 py-3 flex flex-col gap-2.5">
+            <div className="flex flex-wrap gap-2">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search houses, seats, words"
+                aria-label="Search houses, seats, words"
+                className="h-10 min-w-0 px-3.5 rounded-[2px] border border-[rgba(216,184,120,.22)] bg-[rgba(255,255,255,.02)] text-[17px] text-[#ece5d6] outline-none focus:border-[rgba(216,184,120,.5)] placeholder:italic placeholder:text-[#7d7566]"
+                style={{ ...GARAMOND, flex: '1 1 240px' }}
+              />
+              <select
+                value={regionFilter}
+                onChange={(e) => setRegionFilter(e.target.value)}
+                aria-label="Region"
+                className="h-10 min-w-0 px-3 rounded-[2px] border border-[rgba(216,184,120,.22)] bg-[#1f1d1a] text-[#ece5d6] uppercase outline-none focus:border-[rgba(216,184,120,.5)] cursor-pointer sm:max-w-[220px]"
+                style={{ ...CINZEL, fontSize: 11, letterSpacing: '.14em', flex: '1 1 150px' }}
+              >
+                {regions.map((r) => (
+                  <option key={r} value={r}>
+                    {r === 'all' ? 'All regions' : r}
+                  </option>
+                ))}
+              </select>
+              <Segmented
+                options={[
+                  { value: 'banners', label: 'Banners' },
+                  { value: 'roll', label: 'Roll' },
+                ]}
+                value={view}
+                onChange={setView}
+                size={10}
+                height={40}
+              />
+            </div>
+            {shownSections.length > 0 && (
+              <nav className="flex gap-x-5 gap-y-1.5 overflow-x-auto whitespace-nowrap pb-0.5 uppercase [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Sections" style={{ ...CINZEL, fontSize: 10, letterSpacing: '.22em' }}>
+                {shownSections.map(({ key }) => (
+                  <a key={key} href={`#sec-${key}`} className={`flex items-center gap-2 py-1 text-[#9d9483] hover:text-[#eed49b] transition-colors ${FOCUS}`}>
+                    <span>{JUMP_LABEL[key] ?? key}</span>
+                    <span style={{ color: INK.gold }}>{sections[key].length}</span>
+                  </a>
+                ))}
+              </nav>
+            )}
+          </div>
         </div>
 
-        {/* Grid */}
-        {loading && (
-          <p className="text-center text-got-parchment/50 italic py-12" style={{ fontFamily: 'EB Garamond, serif' }}>
-            Consulting the maesters...
-          </p>
-        )}
+        <main className="max-w-[1240px] mx-auto px-5 sm:px-7 pt-2 pb-10">
+          {loading && (
+            <p className="text-center italic py-12 text-[18px]" style={{ ...GARAMOND, color: INK.muted }}>
+              Consulting the maesters…
+            </p>
+          )}
+          {error && (
+            <p className="text-center py-12 text-[18px]" style={{ ...GARAMOND, color: '#c9766a' }}>
+              {error}
+            </p>
+          )}
 
-        {error && (
-          <p className="text-center text-got-red-bright py-12" style={{ fontFamily: 'EB Garamond, serif' }}>
-            {error}
-          </p>
-        )}
-
-        {!loading && !error && (
-          <div className="flex flex-col gap-10">
-            {SECTIONS.map(({ key, label }) => {
+          {!loading &&
+            !error &&
+            shownSections.map(({ key, label, note }) => {
               const items = sections[key]
-              if (!items || items.length === 0) return null
+              const open = (house) => handleCardClick(house)
               return (
-                <div key={key}>
-                  <SectionHeading label={label} count={items.length} />
-                  <motion.div layout className="grid grid-cols-2 sm:grid-cols-4 gap-5">
-                    {items.map((house) => (
-                      <HouseCard
-                        key={house.id}
-                        house={house}
-                        isSelected={selectedId === house.id}
-                        onClick={() => handleCardClick(house)}
-                      />
-                    ))}
-                    {/* Council sits beside Royalty, filling the columns the
-                        royalty card(s) don't use — col-span-2/sm:col-span-3
-                        assumes one royalty house, which is all the data has
-                        today; a second simultaneous royalty house would
-                        need this adjusted. Hidden under the North's own
-                        tab: this council governs the Six/Seven Kingdoms,
-                        not the independent North, which has no tracked
-                        council of its own yet. */}
-                    {key === 'royalty' && effectiveKingdom !== 'Kingdom of the North' && (
-                      <CouncilPanel seats={councilSeats} ruler={computeAuthority(items[0])} />
-                    )}
-                  </motion.div>
-                </div>
+                <section key={key} id={`sec-${key}`} className="pt-[30px] scroll-mt-[120px]">
+                  <SectionHeading label={label} note={note} count={items.length} />
+
+                  {key === 'royalty' || key === 'order' ? (
+                    // the royal house beside the Small Council (not under the
+                    // independent North's tab); the Night's Watch beside its officers
+                    <div className="flex flex-col gap-2">
+                      {items.map((house, i) => {
+                        const nightsWatch = house.slug === NIGHTS_WATCH_SLUG
+                        const council =
+                          key === 'royalty' ? (i === 0 && !ruledNorth ? COUNCILS.small_council : null) : nightsWatch ? COUNCILS.nights_watch : null
+                        return (
+                          <FeatureBlock
+                            key={house.id}
+                            house={house}
+                            label={key === 'royalty' ? <CrownLabel house={house} /> : null}
+                            council={council}
+                            seats={council === COUNCILS.small_council ? councilSeats.small_council : councilSeats.nights_watch}
+                            isSelected={selectedId === house.id}
+                            onClick={() => open(house)}
+                            dark={key === 'order'}
+                          />
+                        )
+                      })}
+                    </div>
+                  ) : view === 'roll' ? (
+                    <div className="flex flex-col border-t border-[rgba(216,184,120,.1)]">
+                      {items.map((house) => (
+                        <HouseRollRow key={house.id} house={house} sectionKey={key} isSelected={selectedId === house.id} onClick={() => open(house)} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(236px, 1fr))' }}>
+                      {items.map((house) => (
+                        <HouseTile key={house.id} house={house} sectionKey={key} isSelected={selectedId === house.id} onClick={() => open(house)} />
+                      ))}
+                    </div>
+                  )}
+                </section>
               )
             })}
-          </div>
-        )}
 
-        {!loading && !error && filtered.length === 0 && (
-          <p className="text-center text-stone-600 italic py-8" style={{ fontFamily: 'EB Garamond, serif' }}>
-            No house in the realm answers to that.
-          </p>
-        )}
+          {!loading && !error && filtered.length === 0 && (
+            <p className="py-[60px] text-center text-[19px] italic" style={{ ...GARAMOND, color: INK.muted }}>
+              No house answers to that name.
+            </p>
+          )}
+        </main>
       </div>
 
       <AnimatePresence>

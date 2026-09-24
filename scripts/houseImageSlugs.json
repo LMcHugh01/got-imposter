@@ -16,5 +16,22 @@
   { "apiId": 999015, "name": "House Hightower", "slug": "house-hightower" },
   { "apiId": 999016, "name": "House Tarly", "slug": "house-tarly" },
   { "apiId": 999017, "name": "House Frey", "slug": "house-frey" },
-  { "apiId": 999018, "name": "House Royce", "slug": "house-royce" }
+  { "apiId": 999018, "name": "House Royce", "slug": "house-royce" },
+  { "apiId": 999019, "name": "House Ashford", "slug": "house-ashford" },
+  { "apiId": 999020, "name": "House Baelish", "slug": "house-baelish" },
+  { "apiId": 999021, "name": "House Blacktyde", "slug": "house-blacktyde" },
+  { "apiId": 999022, "name": "House Blackwood", "slug": "house-blackwood" },
+  { "apiId": 999023, "name": "House Bracken", "slug": "house-bracken" },
+  { "apiId": 999024, "name": "House Crakehall", "slug": "house-crakehall" },
+  { "apiId": 999025, "name": "House Dayne", "slug": "house-dayne" },
+  { "apiId": 999026, "name": "House Dondarrion", "slug": "house-dondarrion" },
+  { "apiId": 999027, "name": "House Hollard", "slug": "house-hollard" },
+  { "apiId": 999028, "name": "House Manderly", "slug": "house-manderly" },
+  { "apiId": 999029, "name": "House Mormont", "slug": "house-mormont" },
+  { "apiId": 999030, "name": "House Reed", "slug": "house-reed" },
+  { "apiId": 999031, "name": "House Selmy", "slug": "house-selmy" },
+  { "apiId": 999032, "name": "House Tarth", "slug": "house-tarth" },
+  { "apiId": 999033, "name": "House Velaryon", "slug": "house-velaryon" },
+  { "apiId": 999034, "name": "House Payne", "slug": "house-payne" },
+  { "apiId": 999035, "name": "The Night's Watch", "slug": "nights-watch" }
 ]

@@ -13,10 +13,12 @@ export const DEFAULT_YEAR = 298
 
 export const TIMELINE_POINTS = [
   {
-    year: 282,
-    label: '282 AC',
+    // 281, the false spring: the realm still at peace, the year of the great
+    // tourney at Harrenhal, before Robert's Rebellion broke out in 282.
+    year: 281,
+    label: '281 AC',
     title: "The Mad King's Reign",
-    caption: 'Aerys II Targaryen holds the Iron Throne, paranoid and cruel — while the men who will end his reign grow closer by the day.',
+    caption: 'The false spring: Aerys II Targaryen holds the Iron Throne, paranoid and cruel — while the men who will end his reign grow closer by the day.',
     // No `season` — this era predates the show entirely, so there's
     // nothing to credit it to.
   },

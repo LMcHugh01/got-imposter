@@ -31,7 +31,7 @@ export async function fetchAllHouses() {
     tinctTo: row.tinct_to,
     blazon: row.blazon,
     bannermen: row.bannermen ?? [],
-    tier: row.tier, // 'great' | 'vassal'
+    tier: row.tier, // 'great' | 'lordly' | 'knightly' | 'unknown'
     swornTo: row.sworn_to,
   }))
 }
@@ -57,7 +57,7 @@ export async function fetchAllHouseEras() {
     houseId: row.house_id,
     year: row.year,
     eraLabel: row.era_label,
-    status: row.status, // 'active' | 'royalty' | 'extinct', or free text (e.g. 'Exiled') for anything fallen-but-alive
+    status: row.status, // 'active' | 'royalty' | 'exiled' | 'extinct', or free text (e.g. 'Diminished')
     kingdom: row.kingdom,
     currentLord: row.current_lord,
     rulerLabel: row.ruler_label,
@@ -71,6 +71,11 @@ export async function fetchAllHouseEras() {
     commanderTitles: row.commander_titles ?? [],
     branches: row.branches ?? [],
     summary: row.summary,
+    // Optional per-era overrides of the house's own region and tier (a
+    // house that moved, or was raised in rank). Only set when the row has
+    // one, so merging { ...house, ...era } never blanks the house's own.
+    ...(row.region ? { region: row.region } : {}),
+    ...(row.tier ? { tier: row.tier } : {}),
   }))
 }
 
@@ -97,5 +102,32 @@ export async function fetchAllSmallCouncil() {
     characterName: row.character_name,
     house: row.house,
     sortOrder: row.sort_order,
+    council: row.council ?? 'small_council', // 'small_council' | 'nights_watch'
+  }))
+}
+
+/**
+ * Fetch the castles shown on the map: which to show and their icon size
+ * ('large' | 'medium' | 'small'). Who holds each one isn't stored here;
+ * the map works it out per era from the houses' seats. `mapMarker` is the
+ * map's name for it when that differs from `name`; `aliases` are other names
+ * a house might list it under as a seat; `x`/`y` place a castle the map has
+ * no marker for.
+ */
+export async function fetchAllCastles() {
+  const { data, error } = await supabase.from('castles').select('*').order('name', { ascending: true })
+
+  if (error) {
+    throw new Error(`Failed to fetch castles: ${error.message}`)
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    iconSize: row.icon_size,
+    mapMarker: row.map_marker,
+    aliases: row.aliases ?? [],
+    x: row.x,
+    y: row.y,
   }))
 }
