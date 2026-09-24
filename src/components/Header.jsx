@@ -45,7 +45,7 @@ function AccountLink({ onClick, className = '' }) {
         onClick={onClick}
         className={({ isActive }) =>
           [
-            'flex items-center gap-2 text-sm tracking-widest uppercase transition-colors duration-200',
+            'flex items-center gap-2 text-sm tracking-widest uppercase whitespace-nowrap transition-colors duration-200',
             isActive ? 'text-got-gold' : 'text-realm-gold hover:text-got-parchment',
             className,
           ].join(' ')
@@ -68,12 +68,12 @@ export default function Header() {
     // and scrolls away with the page (a transparent header can't stay fixed
     // without content scrolling underneath its links).
     <header className="relative z-50">
-      <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-8">
         {/* Brand — matches the Home hero's crown + "Westerosi Games" mark */}
-        <Link to="/" className="flex items-center gap-2.5 select-none">
+        <Link to="/" className="flex items-center gap-2.5 select-none shrink-0">
           <FaCrown className="text-lg text-got-gold leading-none" />
           <span
-            className="text-base tracking-[0.2em] uppercase text-got-gold font-bold hidden sm:inline"
+            className="text-base tracking-[0.2em] uppercase text-got-gold font-bold hidden sm:inline md:hidden lg:inline whitespace-nowrap"
             style={{ fontFamily: 'Cinzel Decorative, serif' }}
           >
             Westerosi Games
@@ -81,7 +81,7 @@ export default function Header() {
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden md:flex items-center gap-5 lg:gap-8">
           {NAV_LINKS.map((link) => (
             <NavItem key={link.to} {...link} />
           ))}

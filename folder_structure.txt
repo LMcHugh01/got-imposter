@@ -84,7 +84,7 @@
 │   │   ├── imposterOptions.js
 │   │   ├── leadershipStyles.js
 │   │   ├── ravens.js
-│   │   ├── roleweights.js
+│   │   ├── roleWeights.js
 │   │   └── whispers.js
 │   ├── gameEngine
 │   │   ├── allegiances.js
@@ -116,7 +116,6 @@
 │   │   ├── whispers.js
 │   │   └── whispers.test.js
 │   ├── index.css
-│   ├── index.ts
 │   ├── lib
 │   │   ├── allegiancesStorage.js
 │   │   ├── auth.jsx
@@ -213,6 +212,10 @@
 │   │       └── Houses.jsx
 │   └── store
 │       └── gameStore.js
+├── supabase
+│   └── functions
+│       └── delete-account
+│           └── index.ts
 └── vite.config.js
 
-30 directories, 186 files
+33 directories, 186 files
