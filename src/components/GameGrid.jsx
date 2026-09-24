@@ -11,12 +11,7 @@ import {
   filterGames,
   describeGame,
 } from '../data/games'
-import { ImposterOrnament } from '../pages/games/imposter/ImposterHome'
-import { SixGuesses } from '../pages/games/whispers/WhispersHome'
-import { CourtBoard } from '../pages/games/allegiances/AllegiancesHome'
-import { Candle } from '../pages/games/ravens/RavensHome'
-import { TenSeats } from '../pages/games/draft/DraftIntro'
-import { EightBattles } from '../pages/games/campaign/draft/DraftIntro'
+import GameMark from './GameMark'
 
 /**
  * components/GameGrid.jsx
@@ -25,16 +20,6 @@ import { EightBattles } from '../pages/games/campaign/draft/DraftIntro'
  * played — with filters for mode, player count and length. Used on the
  * Home and Games pages.
  */
-
-// The same small mark each game uses on its own title screen.
-const ORNAMENTS = {
-  imposter: <ImposterOrnament />,
-  campaign: <EightBattles ready />,
-  draft: <TenSeats name="Stark" />,
-  whispers: <SixGuesses />,
-  allegiances: <CourtBoard />,
-  ravens: <Candle />,
-}
 
 function FilterGroup({ label, options, value, onChange }) {
   return (
@@ -78,7 +63,7 @@ function GameTile({ game }) {
         className={`group h-full flex flex-col items-center text-center px-5 pt-7 pb-6 transition-colors duration-200 hover:bg-[#25221d] ${FOCUS}`}
       >
         <div className="h-16 flex items-center justify-center scale-[0.8]" aria-hidden="true">
-          {ORNAMENTS[game.id]}
+          <GameMark id={game.id} />
         </div>
         <h3
           className="mt-4 text-[21px] sm:text-[22px] font-normal tracking-[0.12em] text-realm-cream group-hover:text-realm-gilt transition-colors"

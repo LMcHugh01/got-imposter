@@ -2,11 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   GameHomePage,
-  GameHero,
   GamePrimaryButton,
   GameBackLink,
   GameStats,
-  Diamond,
   Hairline,
   SectionLabel,
   CINZEL,
@@ -15,19 +13,8 @@ import {
 import { MenuList } from '../../../components/MenuList'
 import { loadAllegiances } from '../../../lib/allegiancesStorage'
 import RecordPrompt from '../../../components/RecordPrompt'
-import { ASSEMBLIES, PATIENCE, TIER_COLORS } from '../../../data/allegiances'
-
-// A scrambled 4×4 board in the four bond colours — sixteen names, four bonds.
-const BOARD = [0, 1, 2, 3, 2, 3, 0, 1, 1, 0, 3, 2, 3, 2, 1, 0]
-export function CourtBoard() {
-  return (
-    <div className="grid grid-cols-4 gap-[13px]">
-      {BOARD.map((tier, i) => (
-        <Diamond key={i} size={9} fill={TIER_COLORS[tier]} />
-      ))}
-    </div>
-  )
-}
+import { ASSEMBLIES, PATIENCE } from '../../../data/allegiances'
+import { GameHeroFor } from '../../../components/GameMark'
 
 const STEPS = [
   'Sixteen names share four hidden bonds: a house, a place, a cause, a fate.',
@@ -62,11 +49,8 @@ export default function AllegiancesHome() {
 
   return (
     <GameHomePage>
-      <GameHero
-        ornament={<CourtBoard />}
-        eyebrow="A Game of Diplomacy"
-        title="Allegiances"
-        tagline="Four Bonds"
+      <GameHeroFor
+        id="allegiances"
         description="Sixteen names, four bonds between them. Find the four who belong together before the court loses patience."
       />
 

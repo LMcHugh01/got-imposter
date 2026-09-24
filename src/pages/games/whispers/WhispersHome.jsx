@@ -2,11 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   GameHomePage,
-  GameHero,
   GamePrimaryButton,
   GameBackLink,
   GameStats,
-  Diamond,
   Hairline,
   SectionLabel,
   CINZEL,
@@ -14,22 +12,8 @@ import {
 } from '../../../components/GameHome'
 import { loadWhispers } from '../../../lib/whispersStorage'
 import RecordPrompt from '../../../components/RecordPrompt'
-import { MAX_GUESSES, CLOSE_BAND } from '../../../data/whispers'
-
-// Six guesses: five open marks, and the last one gilded — the name you draw out.
-export function SixGuesses() {
-  return (
-    <div className="flex items-center gap-3.5">
-      {Array.from({ length: MAX_GUESSES }, (_, i) =>
-        i === MAX_GUESSES - 1 ? (
-          <Diamond key={i} size={14} fill="#d8b878" className="ml-1" />
-        ) : (
-          <Diamond key={i} size={9} line="rgba(216,184,120,.45)" />
-        ),
-      )}
-    </div>
-  )
-}
+import { CLOSE_BAND } from '../../../data/whispers'
+import { GameHeroFor } from '../../../components/GameMark'
 
 const STEPS = [
   'Name any character from the realm.',
@@ -50,11 +34,8 @@ export default function WhispersHome() {
 
   return (
     <GameHomePage>
-      <GameHero
-        ornament={<SixGuesses />}
-        eyebrow="A Game of Deduction"
-        title="Whispers"
-        tagline="Six Guesses"
+      <GameHeroFor
+        id="whispers"
         description="Your little birds have a name they will not say. Six guesses to draw it out of them."
       />
 

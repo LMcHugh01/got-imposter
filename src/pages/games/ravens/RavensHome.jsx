@@ -2,10 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   GameHomePage,
-  GameHero,
   GamePrimaryButton,
   GameBackLink,
-  Diamond,
   Hairline,
   SectionLabel,
   CINZEL,
@@ -13,22 +11,7 @@ import {
   FOCUS,
 } from '../../../components/GameHome'
 import { loadRavensGame, clearRavensGame } from '../../../lib/ravensStorage'
-
-// A lit candle between the rival houses' embers.
-export function Candle() {
-  const wick = { background: 'linear-gradient(180deg, transparent, #d8b878)' }
-  return (
-    <div className="flex items-center gap-4 h-[34px]">
-      <Diamond size={8} line="#c9766a" />
-      <Diamond size={8} line="#c9766a" />
-      <div className="w-px h-[30px]" style={wick} />
-      <Diamond size={15} fill="#d8b878" />
-      <div className="w-px h-[30px]" style={wick} />
-      <Diamond size={8} line="#c9766a" />
-      <Diamond size={8} line="#c9766a" />
-    </div>
-  )
-}
+import { GameHeroFor } from '../../../components/GameMark'
 
 const STEPS = [
   'Split into two to four houses. On each turn, one player from the house holds the phone and describes.',
@@ -50,11 +33,8 @@ export default function RavensHome() {
 
   return (
     <GameHomePage>
-      <GameHero
-        ornament={<Candle />}
-        eyebrow="Pass & Play · 4–20 Players"
-        title="Ravens"
-        tagline="A Game of Words"
+      <GameHeroFor
+        id="ravens"
         description="Send your message before the candle burns out. Describe the name, but never speak the forbidden words."
       />
 

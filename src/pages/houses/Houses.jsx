@@ -1,38 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import PageWrapper from '../../components/PageWrapper'
 import { fetchAllHouses, fetchAllHouseEras, fetchAllSmallCouncil } from '../../lib/houseService'
 import PageHeading from '../../components/PageHeading'
-
-// Starts with two points; nothing below assumes exactly two, so a third
-// (say, 300 AC) is just another entry here plus matching house_eras rows —
-// no component changes needed. title/caption are page-level flavor text
-// describing the era itself, not any one house, so they live here rather
-// than in the DB.
-const TIMELINE_POINTS = [
-  {
-    year: 282,
-    label: '282 AC',
-    title: "The Mad King's Reign",
-    caption: 'Aerys II Targaryen holds the Iron Throne, paranoid and cruel — while the men who will end his reign grow closer by the day.',
-    // No `season` — this era predates the show entirely, so there's
-    // nothing to credit it to.
-  },
-  {
-    year: 298,
-    label: '298 AC',
-    season: 'Game of Thrones: Season 1',
-    title: 'The Realm of Robert I',
-    caption: 'Seven kingdoms, one crown, and every great house still seated in its ancestral castle.',
-  },
-  {
-    year: 305,
-    label: '305 AC',
-    season: 'Game of Thrones: Season 8',
-    title: 'After the Long Night',
-    caption: 'The North breaks free, a council answers for six kingdoms, and two great houses are ash.',
-  },
-]
+import Timeline from '../../components/Timeline'
+import { TIMELINE_POINTS } from '../../data/timeline'
 
 // Display/tab order for kingdoms — fixed here rather than derived
 // alphabetically or from data order, so tabs don't reshuffle as more
@@ -598,71 +571,6 @@ function HouseModal({ house, houseEras, onClose, onYearSelect }) {
   )
 }
 
-function Timeline({ points, selectedYear, onSelect, rulerName }) {
-  const current = points.find((p) => p.year === selectedYear)
-  return (
-    <div className="w-full flex flex-col items-center gap-4 sm:gap-6 py-2">
-      <div className="flex items-center gap-2 sm:gap-4 w-full max-w-lg">
-        {points.map((p, i) => (
-          <div key={p.year} className="flex-1 flex flex-col items-center text-center">
-            <button onClick={() => onSelect(p.year)} className="flex flex-col items-center gap-1.5 sm:gap-2">
-              <span
-                className={['text-lg sm:text-2xl font-bold', selectedYear === p.year ? 'text-got-gold' : 'text-stone-600'].join(' ')}
-                style={{ fontFamily: 'Cinzel, serif' }}
-              >
-                {p.label}
-              </span>
-              <div className="flex items-center gap-1.5 w-full">
-                <div
-                  className={['flex-1 h-px', i === 0 ? 'bg-gradient-to-r from-transparent to-stone-700' : 'bg-stone-700'].join(' ')}
-                />
-                <span
-                  className={[
-                    'w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 shrink-0 rotate-45 border',
-                    selectedYear === p.year ? 'bg-got-gold border-got-gold' : 'bg-stone-900 border-stone-600',
-                  ].join(' ')}
-                />
-                <div
-                  className={[
-                    'flex-1 h-px',
-                    i === points.length - 1 ? 'bg-gradient-to-l from-transparent to-stone-700' : 'bg-stone-700',
-                  ].join(' ')}
-                />
-              </div>
-            </button>
-          </div>
-        ))}
-      </div>
-      {current && (
-        <div className="text-center px-2">
-          {current.season && (
-            <p
-              className="text-[9px] sm:text-[10px] tracking-[0.28em] uppercase text-got-parchment/40 mb-1.5"
-              style={{ fontFamily: 'Cinzel, serif' }}
-            >
-              {current.season}
-            </p>
-          )}
-          <p
-            className="font-bold leading-tight"
-            style={{
-              fontFamily: 'Cinzel, serif',
-              color: '#f7efdc',
-              textShadow: '0 0 30px rgba(201,167,90,0.2)',
-              fontSize: 'clamp(20px, 5vw, 30px)',
-            }}
-          >
-            {rulerName || current.title}
-          </p>
-          <p className="text-sm sm:text-base italic text-got-parchment/50 mt-1.5 max-w-lg" style={{ fontFamily: 'EB Garamond, serif' }}>
-            {current.caption}
-          </p>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // One kingdom this era (298, before the split) → a plain label, nothing to
 // click. More than one (305, once the North secedes) → tabs, each filtering
 // the grid to just that kingdom's houses. Scales to a third kingdom later
@@ -862,7 +770,9 @@ export default function Houses() {
   const [selectedYear, setSelectedYear] = useState(298)
   const [selectedId, setSelectedId] = useState(null)
   const [search, setSearch] = useState('')
-  const [regionFilter, setRegionFilter] = useState('all')
+  // ?region= and ?house= arrive from the map's panel links
+  const [params] = useSearchParams()
+  const [regionFilter, setRegionFilter] = useState(params.get('region') ?? 'all')
   const [kingdomFilter, setKingdomFilter] = useState(null)
 
   useEffect(() => {
@@ -889,6 +799,13 @@ export default function Houses() {
       cancelled = true
     }
   }, [])
+
+  // Open the house named in ?house= once the data is in.
+  useEffect(() => {
+    const slug = params.get('house')
+    const match = slug && houses.find((h) => h.slug === slug)
+    if (match) setSelectedId(match.id)
+  }, [houses]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Merge each static house with its era row for the selected year — pure
   // client-side lookup, so switching timeline points needs no refetch. A

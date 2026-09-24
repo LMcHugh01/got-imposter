@@ -1,9 +1,13 @@
 /**
  * data/games.js
  *
- * What the site offers, shared by the Home and Games pages.
+ * The one source for every game's details: its name, tagline ("A Game of
+ * Deduction."), motto ("Six Guesses", shown under the name on its own
+ * screen) and route. The Home page, the Games page and each game's own
+ * screen all read them from here; each game's mark lives in
+ * components/GameMark.jsx.
  *
- * Each game carries what the filters need:
+ * Each game also carries what the filters need:
  *   mode     'solo' | 'pass'        (pass = pass-and-play on one phone)
  *   players  [min, max]
  *   minutes  [min, max]             rough length of one game or session
@@ -17,6 +21,7 @@ export const GAMES = [
     id: 'imposter',
     title: 'Imposter',
     description: 'A Game of Subterfuge.',
+    motto: 'One Traitor',
     to: '/games/imposter',
     mode: 'pass',
     players: [2, 20],
@@ -26,6 +31,7 @@ export const GAMES = [
     id: 'campaign',
     title: 'Campaign',
     description: 'A Game of Strategy.',
+    motto: 'Eight Battles',
     to: '/games/campaign',
     mode: 'solo',
     players: [1, 1],
@@ -35,6 +41,7 @@ export const GAMES = [
     id: 'draft',
     title: 'Draft',
     description: 'A Game of Counsel.',
+    motto: 'Ten Seats',
     to: '/games/draft',
     mode: 'solo',
     players: [1, 1],
@@ -44,6 +51,7 @@ export const GAMES = [
     id: 'whispers',
     title: 'Whispers',
     description: 'A Game of Deduction.',
+    motto: 'Six Guesses',
     to: '/games/whispers',
     mode: 'solo',
     players: [1, 1],
@@ -53,6 +61,7 @@ export const GAMES = [
     id: 'allegiances',
     title: 'Allegiances',
     description: 'A Game of Diplomacy.',
+    motto: 'Four Bonds',
     to: '/games/allegiances',
     mode: 'solo',
     players: [1, 1],
@@ -62,6 +71,7 @@ export const GAMES = [
     id: 'ravens',
     title: 'Ravens',
     description: 'A Game of Speed.',
+    motto: 'One Candle',
     to: '/games/ravens',
     mode: 'pass',
     players: [4, 20],
@@ -69,12 +79,24 @@ export const GAMES = [
   },
 ]
 
+/** A game's details by id ('draft', 'ravens', …). */
+export function getGame(id) {
+  const game = GAMES.find((g) => g.id === id)
+  if (!game) throw new Error(`Unknown game: ${id}`)
+  return game
+}
+
 export const UPCOMING_GAMES = [{ id: 'trivia', title: 'Trivia', description: 'A Game of Scholarship.' }]
 
 export const EXPLORE = [
-  { title: 'Characters', description: 'The people of Westeros.', to: '/characters' },
-  { title: 'Houses', description: 'The great houses of the realm.', to: '/houses' },
+  { id: 'map', title: 'The Map', description: 'The lands of the realm, from the Wall to Dorne.', to: '/maps' },
+  { id: 'characters', title: 'Characters', description: 'The lords, knights and wanderers of Westeros.', to: '/characters' },
+  { id: 'houses', title: 'Houses', description: 'The great houses, their sigils and their words.', to: '/houses' },
 ]
+
+// The four games shown on the home page: two to pass around, two to play
+// alone. Every game is on the Games page.
+export const FEATURED_GAMES = ['imposter', 'ravens', 'allegiances', 'campaign']
 
 /* ---------------- filters ---------------- */
 

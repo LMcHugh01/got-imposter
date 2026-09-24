@@ -29,7 +29,7 @@ const SECTIONS = [
 export default function Privacy() {
   return (
     <PageWrapper className="justify-start text-realm-ink">
-      <PageHeading className="pt-4" eyebrow="Westerosi Games" title="What We Store" subtitle="In plain words." />
+      <PageHeading className="pt-4" eyebrow="Westerosity" title="What We Store" subtitle="In plain words." />
       <div className="w-full max-w-[600px] mx-auto mt-12 flex flex-col gap-9 text-left pb-10">
         {SECTIONS.map((s) => (
           <section key={s.title}>

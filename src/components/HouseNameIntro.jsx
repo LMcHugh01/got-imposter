@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { GameHomePage, GameHero, GamePrimaryButton, GameBackLink, CINZEL } from './GameHome'
+import { GameHomePage, GamePrimaryButton, GameBackLink, CINZEL } from './GameHome'
+import { GameHeroFor } from './GameMark'
 import RecordPrompt from './RecordPrompt'
 
 const MAX_NAME_LENGTH = 20
@@ -15,10 +16,11 @@ export function normalizeHouseName(raw) {
  * components/HouseNameIntro.jsx
  *
  * Start screen for games where the player names their house first
- * (Draft, Campaign). `renderOrnament(name)` receives the cleaned-up name
- * so each game's ornament can react as the player types.
+ * (Draft, Campaign). The hero (mark, tagline, name, motto) comes from the
+ * game's entry in data/games.js; the game supplies its description and
+ * the button's words.
  */
-export default function HouseNameIntro({ renderOrnament, eyebrow, title, tagline, description, cta, onPlay }) {
+export default function HouseNameIntro({ gameId, description, cta, onPlay }) {
   const [name, setName] = useState('')
   const normalized = normalizeHouseName(name)
   const canPlay = normalized.length > 0
@@ -30,13 +32,7 @@ export default function HouseNameIntro({ renderOrnament, eyebrow, title, tagline
 
   return (
     <GameHomePage>
-      <GameHero
-        ornament={renderOrnament(normalized)}
-        eyebrow={eyebrow}
-        title={title}
-        tagline={tagline}
-        description={description}
-      />
+      <GameHeroFor id={gameId} description={description} />
 
       <form onSubmit={handleSubmit} className="w-full flex flex-col items-center">
         <div className="w-full max-w-[440px] mt-[52px]">

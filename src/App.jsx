@@ -10,6 +10,7 @@ import About from './pages/about/About'
 import Characters from './pages/characters/Characters'
 import Houses from './pages/houses/Houses'
 import Privacy from './pages/Privacy'
+import Maps from './pages/maps/Maps'
 
 import SignUp from './pages/auth/SignUp'
 import CheckEmail from './pages/auth/CheckEmail'
@@ -53,6 +54,7 @@ function AppRoutes() {
           <Route path="/about" element={<About />} />
           <Route path="/characters" element={<Characters />} />
           <Route path="/houses" element={<Houses />} />
+          <Route path="/maps" element={<Maps />} />
           <Route path="/privacy" element={<Privacy />} />
 
           <Route path="/signup" element={<SignUp />} />

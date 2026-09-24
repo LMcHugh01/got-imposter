@@ -90,6 +90,42 @@ function initials(name) {
   return (first + last).toUpperCase()
 }
 
+// A character's portrait as a small circle beside their name. Portraits are
+// taller than wide (343 × 494), so the image fills the circle's width and is
+// anchored to the top, where the face is; square ones fit as they are. No
+// image, or one that fails to load: their initials instead.
+function Portrait({ character, size = 44 }) {
+  const [broken, setBroken] = useState(false)
+  const src = character.image_url
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        flex: 'none',
+        borderRadius: '50%',
+        overflow: 'hidden',
+        background: '#1b1814',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {src && !broken ? (
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          onError={() => setBroken(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }}
+        />
+      ) : (
+        <span style={{ fontFamily: CINZEL, fontSize: 13, color: '#8f8571' }}>{initials(character.name)}</span>
+      )}
+    </div>
+  )
+}
+
 // Display-only tiering — colors/labels a rating, doesn't touch the engine.
 function tier(v) {
   if (v == null) return { label: '—', color: TEXT_MUTED }
@@ -181,21 +217,61 @@ function GhostButton({ onClick, small, children }) {
   )
 }
 
-// Matches Houses.jsx's search/filter treatment — bg-got-charcoal/40 over a
-// stone-700 border reads correctly against the app's shared background,
-// unlike the old hardcoded INPUT_BG/BORDER_SOFT hex values below, which
-// were tuned only for this page's own (now-removed) background override.
-const selectClassName =
-  'rounded border border-stone-700 bg-got-charcoal/40 text-got-parchment focus:outline-none focus:border-got-gold/50 cursor-pointer'
-const selectStyle = {
-  flex: '1 1 175px',
-  minWidth: 0,
-  fontSize: '.72rem',
-  letterSpacing: '.14em',
-  textTransform: 'uppercase',
-  padding: '12px 11px',
-  minHeight: 46,
-  fontFamily: CINZEL,
+// Short forms for a picked filter, where each box is narrow. A house shows
+// as its surname everywhere ("House Baratheon of Storm's End" → "Baratheon");
+// roles shorten on phones only ("Master of Coin" → "Coin",
+// "Grand Maester" → "Maester", "King / Queen" → "King".
+function shortHouse(house) {
+  return (house || '').replace(/^House\s+/i, '').replace(/\s+of\s+.*$/i, '')
+}
+function shortRole(label) {
+  if (!label) return label
+  return label.replace(/^Master of\s+/i, '').replace(/^Grand\s+/i, '').replace(/\s*\/.*$/, '')
+}
+
+// One filter: a compact box showing the filter's name at rest ("Houses")
+// and the chosen value once one is picked ("Stark", in gold). The real
+// <select> sits invisibly on top, so tapping opens the native picker and
+// screen readers announce a normal dropdown; its options can stay
+// descriptive ("All houses") because the box, not the select, shows the text.
+function FilterSelect({ label, value, restValue, shown, shownShort, onChange, children }) {
+  const active = value !== restValue
+  return (
+    <div
+      className={[
+        'relative flex items-center justify-between gap-1 min-w-0 rounded border bg-got-charcoal/40 transition-colors',
+        'h-10 px-1.5 justify-center sm:justify-between sm:h-[46px] sm:px-3 md:flex-1',
+        'focus-within:border-got-gold/60',
+        active ? 'border-got-gold/60 text-got-gold' : 'border-stone-700 text-got-parchment',
+      ].join(' ')}
+    >
+      <span
+        className="truncate uppercase text-[9.5px] tracking-[0.06em] sm:text-[11.5px] sm:tracking-[0.14em]"
+        style={{ fontFamily: CINZEL }}
+      >
+        {active ? (
+          <>
+            <span className="sm:hidden">{shownShort ?? shown}</span>
+            <span className="hidden sm:inline">{shown}</span>
+          </>
+        ) : (
+          label
+        )}
+      </span>
+      {/* on phones the whole box is plainly tappable; the arrow would only take room */}
+      <svg width="8" height="5" viewBox="0 0 8 5" aria-hidden="true" className="hidden sm:block shrink-0 opacity-60">
+        <path d="M.5.5 4 4 7.5.5" fill="none" stroke="currentColor" />
+      </svg>
+      <select
+        aria-label={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+      >
+        {children}
+      </select>
+    </div>
+  )
 }
 
 /* ------------------------------------------------------------------ */
@@ -333,8 +409,8 @@ export default function Characters() {
   const ladderRoleId = activeRole ? activeRole.id : selected?.best?.roleId ?? null
   const highlightedWeights = selected ? coefficientsForRole(ladderRoleId, selected) : null
   const selectedFit = selected ? fitFor(selected) : null
-  const rosterTitle = activeRole ? `Ranked as ${activeRole.label}` : 'Ranked by best fit'
-  const gridCols = `minmax(196px,1.7fr)${attributeFilter ? ' 70px' : ''} 74px repeat(${CATEGORIES.length},minmax(50px,.62fr)) 128px`
+  const rosterTitle = activeRole ? `Ranked as ${activeRole.label}` : 'Ranked by overall'
+  const gridCols = `minmax(230px,1.7fr)${attributeFilter ? ' 70px' : ''} 74px repeat(${CATEGORIES.length},minmax(50px,.62fr)) 128px`
 
   return (
     <PageWrapper className="!p-0 !items-stretch">
@@ -354,7 +430,7 @@ export default function Characters() {
             className="pt-[26px] pb-5"
             eyebrow="Game of Thrones"
             title="Characters"
-            subtitle="The people of Westeros, and how well they fit each seat on the council."
+            subtitle="The people of Westeros, and how they rate for each seat on the council."
           />
 
           {loading && (
@@ -364,58 +440,55 @@ export default function Characters() {
 
           {!loading && !error && (
             <section style={{ padding: '22px 0 0' }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9, alignItems: 'center' }}>
+              {/* Search on top (beside the filters on desktop), then the four
+                  filters in one row of equal widths. */}
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-[9px]">
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search by name or house"
-                  className="rounded border border-stone-700 bg-got-charcoal/40 text-got-parchment placeholder:text-stone-600 focus:outline-none focus:border-got-gold/50"
-                  style={{
-                    flex: '2 1 220px',
-                    minWidth: 0,
-                    fontSize: 13,
-                    letterSpacing: '.08em',
-                    padding: '12px 13px',
-                    minHeight: 46,
-                    fontFamily: GARAMOND,
-                  }}
+                  aria-label="Search by name or house"
+                  className="rounded border border-stone-700 bg-got-charcoal/40 text-got-parchment placeholder:text-stone-600 focus:outline-none focus:border-got-gold/50 h-11 sm:h-[46px] md:flex-[1.4] md:min-w-[200px]"
+                  style={{ minWidth: 0, fontSize: 13, letterSpacing: '.08em', padding: '0 13px', fontFamily: GARAMOND }}
                 />
-                <select value={houseFilter} onChange={(e) => setHouseFilter(e.target.value)} className={selectClassName} style={selectStyle}>
-                  <option value="all">All houses</option>
-                  {houses.map((h) => (
-                    <option key={h} value={h}>
-                      {h}
-                    </option>
-                  ))}
-                </select>
-                <select value={styleFilter} onChange={(e) => setStyleFilter(e.target.value)} className={selectClassName} style={selectStyle}>
-                  <option value="all">All styles</option>
-                  {STYLE_GROUPS.map((group) => (
-                    <optgroup key={group.key} label={group.label}>
-                      {group.options.map((s) => (
-                        <option key={`${group.key}:${s}`} value={`${group.key}:${s}`}>
-                          {group.labels[s]}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-                <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className={selectClassName} style={selectStyle}>
-                  <option value="bestFit">Role · Best fit</option>
-                  {ROLES.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      Role · {r.label}
-                    </option>
-                  ))}
-                </select>
-                <select value={attributeFilter} onChange={(e) => setAttributeFilter(e.target.value)} className={selectClassName} style={selectStyle}>
-                  <option value="">Attribute · none</option>
-                  {ALL_ATTRIBUTE_KEYS.map((key) => (
-                    <option key={key} value={key}>
-                      Attribute · {ATTRIBUTE_LABELS[key]}
-                    </option>
-                  ))}
-                </select>
+                <div className="grid grid-cols-4 gap-1.5 sm:gap-2 md:flex md:flex-[3] md:gap-[9px]">
+                  <FilterSelect label="Houses" value={houseFilter} restValue="all" shown={shortHouse(houseFilter)} onChange={setHouseFilter}>
+                    <option value="all">All houses</option>
+                    {houses.map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </FilterSelect>
+                  <FilterSelect label="Styles" value={styleFilter} restValue="all" shown={styleFilter === 'all' ? '' : activeStyleGroup.labels?.[styleFilter.split(':')[1]]} onChange={setStyleFilter}>
+                    <option value="all">All styles</option>
+                    {STYLE_GROUPS.map((group) => (
+                      <optgroup key={group.key} label={group.label}>
+                        {group.options.map((st) => (
+                          <option key={`${group.key}:${st}`} value={`${group.key}:${st}`}>
+                            {group.labels[st]}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </FilterSelect>
+                  <FilterSelect label="Role" value={roleFilter} restValue="bestFit" shown={activeRole?.label} shownShort={shortRole(activeRole?.label)} onChange={setRoleFilter}>
+                    <option value="bestFit">Overall</option>
+                    {ROLES.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </FilterSelect>
+                  <FilterSelect label="Attribute" value={attributeFilter} restValue="" shown={ATTRIBUTE_LABELS[attributeFilter]} shownShort={ATTRIBUTE_SHORT_LABELS[attributeFilter]} onChange={setAttributeFilter}>
+                    <option value="">None</option>
+                    {ALL_ATTRIBUTE_KEYS.map((key) => (
+                      <option key={key} value={key}>
+                        {ATTRIBUTE_LABELS[key]}
+                      </option>
+                    ))}
+                  </FilterSelect>
+                </div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
@@ -454,7 +527,7 @@ export default function Characters() {
                         {sortArrow('attribute')}
                       </div>
                     )}
-                    <div onClick={() => handleSort('fit')} title="Role fit" style={headerCellStyle('fit', 'center')}>
+                    <div onClick={() => handleSort('fit')} title="Overall rating" style={headerCellStyle('fit', 'center')}>
                       OVR{sortArrow('fit')}
                     </div>
                     {CATEGORIES.map((cat) => (
@@ -488,16 +561,7 @@ export default function Characters() {
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
-                          <div
-                            style={{
-                              width: 9,
-                              height: 9,
-                              flex: 'none',
-                              transform: 'rotate(45deg)',
-                              border: '1px solid ' + ((fit ?? 0) >= 85 ? ACCENT : '#2f281c'),
-                              background: (fit ?? 0) >= 85 ? GOLD : 'transparent',
-                            }}
-                          />
+                          <Portrait character={c} />
                           <div style={{ minWidth: 0 }}>
                             <div
                               style={{
@@ -637,7 +701,7 @@ export default function Characters() {
                         }}
                       >
                         {selected.image_url ? (
-                          <img src={selected.image_url} alt={selected.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={selected.image_url} alt={selected.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }} />
                         ) : (
                           <>
                             <span style={{ fontFamily: CINZEL, fontWeight: 600, fontSize: 19, color: GOLD }}>{initials(selected.name)}</span>
