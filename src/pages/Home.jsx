@@ -291,9 +291,7 @@ export default function Home() {
           </h1>
           <span className="hidden sm:block w-20 h-px" style={rule('270deg')} aria-hidden="true" />
         </div>
-        <p className="mt-4 max-w-[520px] text-[19px] sm:text-[21px] italic text-realm-body text-balance" style={GARAMOND}>
-          Games to play with friends or alone, and a guide to the lands, lords and houses of Westeros.
-        </p>
+
         {farewell && (
           <p role="status" className="mt-8 text-[18px] italic text-realm-gold text-balance" style={GARAMOND}>
             Your account has been deleted. Farewell, and may the roads be kind.
