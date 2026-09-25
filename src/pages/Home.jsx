@@ -273,7 +273,7 @@ export default function Home() {
 
   return (
     <PageWrapper className="relative justify-start text-realm-ink !px-0 overflow-hidden">
-      <header className="relative flex flex-col items-center text-center px-6 pt-12 sm:pt-20">
+      <header className="relative flex flex-col items-center text-center px-6 pt-6 sm:pt-20">
         <p className="text-[10px] uppercase tracking-[0.46em] indent-[0.46em] text-realm-muted" style={CINZEL}>
           Game of Thrones Fan Project
         </p>
