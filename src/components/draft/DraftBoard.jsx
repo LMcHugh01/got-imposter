@@ -1,4 +1,4 @@
-import { ArchPortrait, SectionTitle, Diamond, ROMAN, COUNT_WORDS, CINZEL, GARAMOND, GOLD, MUTED } from './draftParts'
+import { ArchPortrait, SectionTitle, Diamond, ROMAN, COUNT_WORDS, CINZEL, GARAMOND, GOLD, MUTED } from './DraftParts'
 
 /**
  * components/draft/DraftBoard.jsx

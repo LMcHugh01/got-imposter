@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { weightsFor } from '../../gameEngine/ratings'
 import { CHAMPION_STYLE_LABELS } from '../../data/championStyles'
 import { ATTRIBUTE_LABELS, ALL_ATTRIBUTE_KEYS } from '../../data/attributes'
-import { ArchPortrait, SectionTitle, Diamond, fitLabel, fitColor, CINZEL, GARAMOND, MUTED } from './draftParts'
+import { ArchPortrait, SectionTitle, Diamond, fitLabel, fitColor, CINZEL, GARAMOND, MUTED } from './DraftParts'
 
 /**
  * components/draft/DraftLedger.jsx

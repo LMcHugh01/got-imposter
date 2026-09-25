@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { DraftStyles, CINZEL, GARAMOND } from './draftParts'
+import { DraftStyles, CINZEL, GARAMOND } from './DraftParts'
 
 /**
  * components/draft/DraftOathModal.jsx

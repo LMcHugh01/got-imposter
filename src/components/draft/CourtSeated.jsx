@@ -8,7 +8,7 @@ import {
 } from '../../gameEngine/houseStats'
 import { ROLES } from '../../data/roleWeights'
 import { BANNER_CLIP } from '../houses/HouseParts'
-import { DraftStyles, ArchPortrait, SectionTitle, Diamond, fitColor, useHouseTints, CINZEL, GARAMOND, MUTED, CREAM } from './draftParts'
+import { DraftStyles, ArchPortrait, SectionTitle, Diamond, fitColor, useHouseTints, CINZEL, GARAMOND, MUTED, CREAM } from './DraftParts'
 
 const roleLabel = (id) => ROLES.find((r) => r.id === id)?.label ?? id
 

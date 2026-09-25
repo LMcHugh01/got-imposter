@@ -1,7 +1,7 @@
 import { ROLES } from '../../data/roleWeights'
 import { ATTRIBUTE_LABELS } from '../../data/attributes'
 import { weightsFor } from '../../gameEngine/ratings'
-import { SectionTitle, ROLE_CODES, ROLE_SHORT, fitColor, CINZEL, GARAMOND, GOLD, MUTED } from './draftParts'
+import { SectionTitle, ROLE_CODES, ROLE_SHORT, fitColor, CINZEL, GARAMOND, GOLD, MUTED } from './DraftParts'
 
 // The three attributes a seat weighs most, for this character (style-driven
 // seats weigh according to the character's style).
