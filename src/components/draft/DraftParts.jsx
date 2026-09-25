@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { fetchAllHouses } from '../../lib/houseService'
 
 /**
- * components/draft/draftParts.jsx
+ * components/draft/DraftParts.jsx
  *
  * Pieces shared by the draft screens (the standalone Draft game and the
  * Campaign's opening draft): fonts and colours, rating tiers, seat names,
