@@ -16,7 +16,7 @@ export default function PageWrapper({ children, className = '' }) {
       transition={{ duration: 0.35, ease: 'easeOut' }}
       className={[
         'min-h-screen w-full flex flex-col items-center',
-        'bg-got-black px-4 py-8',
+        'bg-got-black px-4 py-4',
         className,
       ].join(' ')}
     >

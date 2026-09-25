@@ -6,7 +6,7 @@
  * site is a one-line change (plus the <title> in index.html).
  */
 export const SITE = {
-    name: 'Westerosity',
+    name: 'SerDontosGames',
     tagline: 'Explore the realm. Play for the throne.',
   }
    

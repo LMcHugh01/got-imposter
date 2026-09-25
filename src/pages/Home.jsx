@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import PageWrapper from '../components/PageWrapper'
 import { CINZEL, GARAMOND, FOCUS } from '../components/GameHome'
@@ -8,9 +9,9 @@ import { SITE } from '../data/site'
 /**
  * pages/Home.jsx
  *
- * The lobby. The site's name, then three banners hanging from one gilded
- * rod (the Map, Characters, Houses), then four games in a quartered field
- * (two to pass around, two to play alone), and a way to every game.
+ * The lobby. The tagline and a way in (the games, or the map); then four
+ * featured games, each a card in its own colour; then three banners
+ * hanging from one gilded rod (the Map, Characters, Houses).
  */
 
 const GOLD = '#d8b878'
@@ -29,20 +30,15 @@ function Lozenge({ size, fill, line, className = '', style }) {
   )
 }
 
-// A centred section title between two fading gold lines.
-function SectionTitle({ children, id }) {
-  const line = (dir) => ({ background: `linear-gradient(${dir}, transparent, rgba(216,184,120,.5))` })
+// A section title on the left, a fading gold rule, and an optional link on the right.
+function SectionTitle({ children, id, link }) {
   return (
-    <div className="flex items-center justify-center gap-3 sm:gap-5">
-      <span className="w-8 sm:w-20 h-px" style={line('90deg')} aria-hidden="true" />
-      <h2
-        id={id}
-        className="text-[12px] font-normal uppercase whitespace-nowrap tracking-[0.3em] indent-[0.3em] sm:tracking-[0.46em] sm:indent-[0.46em] text-realm-gold"
-        style={CINZEL}
-      >
+    <div className="flex items-center gap-4">
+      <h2 id={id} className="text-[11px] font-normal uppercase whitespace-nowrap tracking-[0.3em] text-realm-gold" style={CINZEL}>
         {children}
       </h2>
-      <span className="w-8 sm:w-20 h-px" style={line('270deg')} aria-hidden="true" />
+      <span className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(216,184,120,.35), rgba(216,184,120,.06))' }} aria-hidden="true" />
+      {link}
     </div>
   )
 }
@@ -164,43 +160,79 @@ function Banners() {
 
 const NUMERALS = ['I', 'II', 'III', 'IV']
 
-function GameQuarter({ game, index }) {
-  const meta = describeGame(game)
+// A small boxed detail: how it's played (Pass & Play in gold), how many play.
+function Chip({ gold, children }) {
   return (
-    <li className="relative">
+    <span
+      className="px-2 py-[5px] border text-[9px] uppercase tracking-[0.18em] whitespace-nowrap"
+      style={{ ...CINZEL, borderColor: gold ? 'rgba(216,184,120,.6)' : 'rgba(216,184,120,.2)', color: gold ? GOLD : '#9d9483' }}
+    >
+      {children}
+    </span>
+  )
+}
+
+// A game's mark, scaled to sit inside its card's panel with room to spare,
+// whatever its natural width (Allegiances' is 77px, Campaign's 265px): at
+// most 120px wide on larger screens and 84px on phones, never enlarged
+// past 0.85. Measured once, when it first renders.
+const MARK_CSS = `.home-mark { transform: scale(var(--fit-phone, .5)); transition: transform .2s; }
+@media (min-width: 640px) { .home-mark { transform: scale(var(--fit-desk, .6)); } }`
+
+function FittedMark({ id }) {
+  const ref = useRef(null)
+  const [width, setWidth] = useState(null)
+  useLayoutEffect(() => {
+    if (ref.current) setWidth(ref.current.scrollWidth)
+  }, [id])
+  const fit = (room, cap) => (width ? Math.min(cap, room / width) : cap)
+  return (
+    <div ref={ref} className="home-mark relative" style={{ '--fit-desk': fit(120, 0.85), '--fit-phone': fit(84, 0.7) }}>
+      <GameMark id={id} />
+    </div>
+  )
+}
+
+// A featured game: a panel in its colour with its mark and numeral, then
+// its name, tagline and how it's played. The whole card is the link.
+function GameCard({ game, index }) {
+  const meta = describeGame(game)
+  const tint = game.tint ?? '#3a342a'
+  return (
+    <li>
       <Link
         to={game.to}
-        className={`group relative flex flex-col items-center text-center px-6 py-14 sm:py-16 overflow-hidden transition-colors duration-300 ${FOCUS}`}
+        className={`group h-full flex rounded-[3px] border border-[rgba(216,184,120,.16)] hover:border-[rgba(216,184,120,.5)] overflow-hidden transition-colors duration-200 ${FOCUS}`}
+        style={{ background: '#22201c' }}
       >
-        <span
-          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-          style={{ background: 'radial-gradient(closest-side, rgba(216,184,120,.08), transparent)' }}
-          aria-hidden="true"
-        />
-        <span
-          className="absolute right-5 top-0 text-[120px] sm:text-[160px] leading-none text-[rgba(216,184,120,.05)] pointer-events-none select-none"
-          style={CINZEL}
+        <div
+          className="relative shrink-0 w-[118px] sm:w-[174px] flex items-center justify-center overflow-hidden border-r"
+          style={{ borderColor: `${tint}`, background: `linear-gradient(160deg, ${tint}cc 0%, ${tint}55 55%, #22201c 100%)` }}
           aria-hidden="true"
         >
-          {NUMERALS[index]}
-        </span>
-        <div className="relative h-[84px] flex items-end justify-center" aria-hidden="true">
-          <GameMark id={game.id} />
+          <span
+            className="absolute right-3 -top-2 leading-none pointer-events-none select-none text-[92px] sm:text-[112px]"
+            style={{ ...CINZEL, color: 'rgba(255,255,255,.07)' }}
+          >
+            {NUMERALS[index]}
+          </span>
+          <FittedMark id={game.id} />
         </div>
-        <h3
-          className="relative mt-7 font-normal tracking-[0.12em] indent-[0.12em] text-realm-cream group-hover:text-realm-gilt transition-colors"
-          style={{ ...CINZEL, fontSize: 'clamp(26px, 3vw, 34px)' }}
-        >
-          {game.title}
-        </h3>
-        <p className="relative mt-1.5 text-[21px] italic text-realm-body" style={GARAMOND}>
-          {game.description}
-        </p>
-        <p className="relative mt-5 text-[10.5px] uppercase tracking-[0.24em] text-realm-muted" style={CINZEL}>
-          <span className={game.mode === 'pass' ? 'text-realm-gold' : ''}>{meta.mode}</span>
-          <span aria-hidden="true"> · </span>
-          {meta.players}
-        </p>
+        <div className="min-w-0 flex-1 px-4 sm:px-6 py-5 sm:py-7">
+          <h3
+            className="font-normal tracking-[0.1em] text-realm-cream group-hover:text-realm-gilt transition-colors text-[20px] sm:text-[24px]"
+            style={CINZEL}
+          >
+            {game.title}
+          </h3>
+          <p className="mt-0.5 text-[17px] sm:text-[19px] italic text-realm-body" style={GARAMOND}>
+            {game.description}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <Chip gold={game.mode === 'pass'}>{meta.mode}</Chip>
+            <Chip>{meta.players}</Chip>
+          </div>
+        </div>
       </Link>
     </li>
   )
@@ -208,37 +240,26 @@ function GameQuarter({ game, index }) {
 
 function FeaturedGames() {
   const games = FEATURED_GAMES.map((id) => GAMES.find((g) => g.id === id)).filter(Boolean)
-  const rule = (dir) => ({ background: `linear-gradient(${dir}, transparent, rgba(216,184,120,.3) 30%, rgba(216,184,120,.3) 70%, transparent)` })
   return (
-    <div className="mt-12 md:mt-14">
-      <div className="relative">
-        {/* the quartering: a cross of gold lines with a diamond where they meet */}
-        <div className="hidden sm:block" aria-hidden="true">
-          <span className="absolute left-1/2 top-6 bottom-6 w-px" style={rule('180deg')} />
-          <span className="absolute top-1/2 left-6 right-6 h-px" style={rule('90deg')} />
-          <Lozenge size={12} fill="#1f1d1a" line={GOLD} className="absolute left-1/2 top-1/2 -ml-[6px] -mt-[6px] z-10" />
-        </div>
-        <ul className="grid grid-cols-1 sm:grid-cols-2">
-          {games.map((g, i) => (
-            <GameQuarter key={g.id} game={g} index={i} />
-          ))}
-        </ul>
-      </div>
-      <div className="flex justify-center mt-14">
-        <Link
-          to="/games"
-          className={`group flex items-center gap-4 pb-3.5 px-2 border-b border-realm-gold/40 hover:border-realm-gold transition-colors ${FOCUS}`}
-        >
-          <Lozenge size={7} fill={GOLD} />
-          <span className="text-[13px] uppercase tracking-[0.34em] text-realm-gold group-hover:text-[#eed49b] transition-colors" style={CINZEL}>
-            All {GAMES.length} games
-          </span>
-          <span className="text-[18px] text-realm-gold transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true">
-            →
-          </span>
-        </Link>
-      </div>
-    </div>
+    <ul className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+      <style>{MARK_CSS}</style>
+      {games.map((g, i) => (
+        <GameCard key={g.id} game={g} index={i} />
+      ))}
+    </ul>
+  )
+}
+
+function AllGamesLink() {
+  return (
+    <Link to="/games" className={`group flex items-center gap-2.5 whitespace-nowrap ${FOCUS}`}>
+      <span className="text-[10px] uppercase tracking-[0.26em] text-realm-gold group-hover:text-[#eed49b] transition-colors" style={CINZEL}>
+        All {GAMES.length} games
+      </span>
+      <span className="text-[15px] text-realm-gold transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true">
+        →
+      </span>
+    </Link>
   )
 }
 
@@ -246,28 +267,32 @@ function FeaturedGames() {
 
 export default function Home() {
   const farewell = useLocation().state?.farewell
+  // "Explore the realm. Play for the throne." over two lines
+  const tagline = SITE.tagline.split(/(?<=\.)\s+/)
+  const rule = (dir) => ({ background: `linear-gradient(${dir}, transparent, rgba(216,184,120,.45))` })
 
   return (
     <PageWrapper className="relative justify-start text-realm-ink !px-0 overflow-hidden">
-      {/* a faint ember glow behind the games */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: 'radial-gradient(900px 700px at 50% 68%, rgba(120,30,28,.10), transparent 70%)' }}
-        aria-hidden="true"
-      />
-
-      <header className="relative flex flex-col items-center text-center px-6 pt-14 sm:pt-24">
-        <p className="text-[11px] uppercase tracking-[0.5em] indent-[0.5em] text-realm-muted" style={CINZEL}>
-          Game of Thrones
+      <header className="relative flex flex-col items-center text-center px-6 pt-12 sm:pt-20">
+        <p className="text-[10px] uppercase tracking-[0.46em] indent-[0.46em] text-realm-muted" style={CINZEL}>
+          Game of Thrones Fan Project
         </p>
-        <h1
-          className="mt-5 font-normal leading-[1.05] tracking-[0.12em] indent-[0.12em] text-realm-cream text-balance"
-          style={{ ...CINZEL, fontSize: 'clamp(40px, 8.5vw, 100px)' }}
-        >
-          {SITE.name}
-        </h1>
-        <p className="mt-4 text-[20px] sm:text-[24px] italic text-realm-body text-balance" style={GARAMOND}>
-          {SITE.tagline}
+        <div className="mt-4 flex items-center justify-center gap-4 sm:gap-7">
+          <span className="hidden sm:block w-20 h-px" style={rule('90deg')} aria-hidden="true" />
+          <h1
+            className="font-normal leading-[1.2] tracking-[0.08em] text-realm-cream text-balance"
+            style={{ ...CINZEL, fontSize: 'clamp(30px, 4.6vw, 46px)' }}
+          >
+            {tagline.map((line, i) => (
+              <span key={i} className="block">
+                {line}
+              </span>
+            ))}
+          </h1>
+          <span className="hidden sm:block w-20 h-px" style={rule('270deg')} aria-hidden="true" />
+        </div>
+        <p className="mt-4 max-w-[520px] text-[19px] sm:text-[21px] italic text-realm-body text-balance" style={GARAMOND}>
+          Games to play with friends or alone, and a guide to the lands, lords and houses of Westeros.
         </p>
         {farewell && (
           <p role="status" className="mt-8 text-[18px] italic text-realm-gold text-balance" style={GARAMOND}>
@@ -276,14 +301,18 @@ export default function Home() {
         )}
       </header>
 
-      <section aria-labelledby="explore-title" className="relative w-full max-w-[1080px] mx-auto mt-24 sm:mt-28 px-6">
-        <SectionTitle id="explore-title">Explore Westeros</SectionTitle>
-        <Banners />
+      <section aria-labelledby="games-title" className="relative w-full max-w-[1120px] mx-auto mt-16 sm:mt-20 px-5 sm:px-6">
+        <SectionTitle id="games-title" link={<AllGamesLink />}>
+          The Games
+        </SectionTitle>
+        <FeaturedGames />
       </section>
 
-      <section aria-labelledby="games-title" className="relative w-full max-w-[1080px] mx-auto mt-28 sm:mt-36 px-6 pb-8">
-        <SectionTitle id="games-title">The Games</SectionTitle>
-        <FeaturedGames />
+      <section aria-labelledby="explore-title" className="relative w-full max-w-[1120px] mx-auto mt-16 sm:mt-20 px-5 sm:px-6 pb-8">
+        <SectionTitle id="explore-title">Explore Westeros</SectionTitle>
+        <div className="mt-2">
+          <Banners />
+        </div>
       </section>
     </PageWrapper>
   )

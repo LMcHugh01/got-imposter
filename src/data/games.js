@@ -22,6 +22,7 @@ export const GAMES = [
     title: 'Imposter',
     description: 'A Game of Subterfuge.',
     motto: 'One Traitor',
+    tint: '#7a1c22', // the colour of its card on the Games page
     to: '/games/imposter',
     mode: 'pass',
     players: [2, 20],
@@ -32,6 +33,7 @@ export const GAMES = [
     title: 'Campaign',
     description: 'A Game of Strategy.',
     motto: 'Eight Battles',
+    tint: '#23407a', // the colour of its card on the Games page
     to: '/games/campaign',
     mode: 'solo',
     players: [1, 1],
@@ -42,6 +44,7 @@ export const GAMES = [
     title: 'Draft',
     description: 'A Game of Counsel.',
     motto: 'Ten Seats',
+    tint: '#8c6a1c', // the colour of its card on the Games page
     to: '/games/draft',
     mode: 'solo',
     players: [1, 1],
@@ -52,6 +55,7 @@ export const GAMES = [
     title: 'Whispers',
     description: 'A Game of Deduction.',
     motto: 'Six Guesses',
+    tint: '#44245e', // the colour of its card on the Games page
     to: '/games/whispers',
     mode: 'solo',
     players: [1, 1],
@@ -62,6 +66,7 @@ export const GAMES = [
     title: 'Allegiances',
     description: 'A Game of Diplomacy.',
     motto: 'Four Bonds',
+    tint: '#2c6334', // the colour of its card on the Games page
     to: '/games/allegiances',
     mode: 'solo',
     players: [1, 1],
@@ -72,6 +77,7 @@ export const GAMES = [
     title: 'Ravens',
     description: 'A Game of Speed.',
     motto: 'One Candle',
+    tint: '#2a4450', // the colour of its card on the Games page
     to: '/games/ravens',
     mode: 'pass',
     players: [4, 20],

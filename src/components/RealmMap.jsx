@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CINZEL, GARAMOND, FOCUS } from './GameHome'
+import { HouseBanner } from './houses/HouseParts'
 import { useArchive, housesAt } from '../lib/useArchive'
 import {
   MAP_DATA_URL,
@@ -27,8 +28,8 @@ import {
  * stood in `year`. Pointing at (or tapping) a castle shows who holds it that
  * year, or that it's unoccupied; clicking it picks out its house.
  * Clicking a neighbour glides across; Esc, the sea or "The whole realm" zooms
- * back out. Lands of houses extinct in that year are hatched, and a region
- * that is its own kingdom that year (the North in 305) gets a gold frontier.
+ * back out. A region that is its own kingdom that year (the North in 305)
+ * gets a gold frontier.
  * Pass `region` + `onRegionChange` to keep the zoomed region in the URL.
  *
  * Simple (`simple`, the home page): colours and hover only; choosing a region
@@ -456,12 +457,6 @@ export default function RealmMap({ simple = false, year = DEFAULT_YEAR, region, 
 
   const houseByKey = useMemo(() => new Map((houses ?? []).map((h) => [surnameKey(h.name), h])), [houses])
 
-  // Houses extinct in this year: their lands get hatched.
-  const fallen = useMemo(
-    () => new Set((houses ?? []).filter((h) => h.status === 'extinct').map((h) => surnameKey(h.name))),
-    [houses]
-  )
-
   // Which kingdom each region belonged to this year, from its houses' rows.
   // Regions outside the largest kingdom (the North in 305) are frontiers.
   const kingdoms = useMemo(() => {
@@ -512,6 +507,23 @@ export default function RealmMap({ simple = false, year = DEFAULT_YEAR, region, 
     if (!model || !data) return []
     return placeCastles(castleRows, data.markers, model.territories).map((c) => ({ ...c, occupant: occupantOf(c, houses) }))
   }, [model, data, castleRows, houses])
+
+  // For the realm list: who leads each region this era (the royal house,
+  // else the highest tier), at which seat, and how many houses it holds. The
+  // same rule as the region panel, so the two always agree.
+  const summaries = useMemo(() => {
+    if (simple || !houses) return {}
+    const royal = (h) => (h.status ?? '').toLowerCase() === 'royalty'
+    return Object.fromEntries(
+      regions.map((r) => {
+        const rc = castles.filter((c) => c.region === r.id)
+        const here = housesInRegion(r.id, houses, rc).sort((a, b) => royal(b) - royal(a) || tierRank(a) - tierRank(b) || a.name.localeCompare(b.name))
+        const lead = here[0]
+        const seat = lead ? seatInRegion(lead, rc) : null
+        return [r.id, { lead: lead ? [lead.name, seat].filter(Boolean).join(' \u00b7 ') : null, count: here.length }]
+      })
+    )
+  }, [simple, houses, regions, castles])
 
   const regionCastles = useMemo(
     () => (zoomed ? castles.filter((c) => c.region === selected) : []),
@@ -634,6 +646,7 @@ export default function RealmMap({ simple = false, year = DEFAULT_YEAR, region, 
   return (
     <div ref={stageRef} className={`flex ${stage.wide ? 'flex-row items-start justify-center' : 'flex-col items-center'}`} style={{ gap: GAP }}>
       <div className="shrink-0">
+        <div className="relative">
         <div
           ref={frameRef}
           className="relative select-none"
@@ -669,11 +682,6 @@ export default function RealmMap({ simple = false, year = DEFAULT_YEAR, region, 
               onClick={onClick}
             >
               <style>{MAP_CSS}</style>
-              <defs>
-                <pattern id="realm-fallen" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-                  <rect width="1.3" height="4" fill="rgba(20, 18, 16, 0.55)" />
-                </pattern>
-              </defs>
               {[...regions].sort((a, b) => kingdoms.frontier.has(a.id) - kingdoms.frontier.has(b.id)).map((r) => {
                 // Whole realm: every region in its colour, a little muted,
                 // brightening on hover. Zoomed: the chosen region in full
@@ -692,18 +700,6 @@ export default function RealmMap({ simple = false, year = DEFAULT_YEAR, region, 
                 const border = kingdoms.frontier.has(r.id) ? THEME.highlight : THEME.border
                 return <RegionLayer key={r.id} items={model.byRegion[r.id]} fill={fill} dim={dim} border={border} />
               })}
-
-              {/* lands of houses extinct this year */}
-              {fallen.size > 0 && (
-                <g pointerEvents="none" fill="url(#realm-fallen)">
-                  {model.territories
-                    .filter((t) => fallen.has(t.holderKey) && (!zoomed || t.region === selected))
-                    .map((t) => (
-                      <path key={t.id} d={t.d} />
-                    ))}
-                </g>
-              )}
-
 
               {zoomed && selected && regionCastles.length > 0 && (
                 <CastleLayer key={selected} castles={regionCastles} unit={unit} lit={litCastles} />
@@ -745,7 +741,34 @@ export default function RealmMap({ simple = false, year = DEFAULT_YEAR, region, 
             </div>
           )}
         </div>
-        <p className="mt-3 text-center text-[13px] italic text-realm-faint" style={GARAMOND}>
+        {/* The Maps page's frame: a gold rule with diamond corners, what's being
+            viewed in the top-left, and a compass mark */}
+        {!simple && (
+          <div aria-hidden="true" className="absolute pointer-events-none" style={{ inset: -8 }}>
+            <div className="absolute inset-0 border" style={{ borderColor: 'rgba(216,184,120,.3)' }} />
+            {[
+              { left: -4, top: -4 },
+              { right: -4, top: -4 },
+              { left: -4, bottom: -4 },
+              { right: -4, bottom: -4 },
+            ].map((pos, i) => (
+              <span key={i} className="absolute w-2 h-2 rotate-45" style={{ ...pos, background: '#d8b878' }} />
+            ))}
+            <div
+              className="absolute top-5 left-5 flex items-center gap-2 px-3 py-1.5 border uppercase"
+              style={{ ...CINZEL, fontSize: 9.5, letterSpacing: '.24em', color: '#ece5d6', borderColor: 'rgba(216,184,120,.35)', background: 'rgba(20,18,16,.72)' }}
+            >
+              <Diamond colour={selectedRegion ? selectedRegion.colour : '#d8b878'} size="h-2 w-2" />
+              {selectedRegion ? selectedRegion.name : kingdoms.count > 1 ? 'The Realm' : `The ${kingdoms.main ?? 'Seven Kingdoms'}`}
+            </div>
+            <div className="absolute top-4 right-5 flex flex-col items-center">
+              <span style={{ ...CINZEL, fontSize: 10, color: '#d8b878' }}>N</span>
+              <span className="w-px h-5" style={{ background: 'linear-gradient(#d8b878, transparent)' }} />
+            </div>
+          </div>
+        )}
+        </div>
+        <p className="mt-4 text-center text-[13px] italic text-realm-faint" style={GARAMOND}>
           Map adapted from{' '}
           <a href="https://www.mapchart.net/westeros.html" className="underline decoration-realm-faint/40 hover:text-realm-muted" target="_blank" rel="noreferrer">
             MapChart
@@ -754,10 +777,15 @@ export default function RealmMap({ simple = false, year = DEFAULT_YEAR, region, 
         </p>
       </div>
 
-      <aside className="w-full min-w-0 max-w-[380px] flex-1 self-stretch overflow-y-auto" style={stage.wide ? { maxHeight: frame.height } : undefined}>
+      <aside className={`w-full min-w-0 ${simple ? 'max-w-[380px]' : 'max-w-[430px]'} flex-1 self-stretch overflow-y-auto`} style={stage.wide ? { maxHeight: frame.height } : undefined}>
         {selectedRegion ? (
           <RegionPanel
             region={selectedRegion}
+            index={regions.findIndex((r) => r.id === selected)}
+            total={regions.length}
+            prevRegion={regions[(regions.findIndex((r) => r.id === selected) - 1 + regions.length) % regions.length]}
+            nextRegion={regions[(regions.findIndex((r) => r.id === selected) + 1) % regions.length]}
+            onGo={select}
             kingdom={kingdoms.count > 1 ? kingdoms.byRegion[selected] : null}
             onBack={() => select(null)}
             houses={houses}
@@ -775,7 +803,7 @@ export default function RealmMap({ simple = false, year = DEFAULT_YEAR, region, 
             onPickCastle={pickCastle}
           />
         ) : (
-          <RegionList regions={regions} hovered={hoveredRegion} onHover={setHoveredRegion} onSelect={select} simple={simple} />
+          <RegionList regions={regions} hovered={hoveredRegion} onHover={setHoveredRegion} onSelect={select} simple={simple} summaries={summaries} />
         )}
       </aside>
     </div>
@@ -784,43 +812,35 @@ export default function RealmMap({ simple = false, year = DEFAULT_YEAR, region, 
 
 /* ---------------- panel ---------------- */
 
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']
+const GOLD = '#d8b878'
+const MUTED = '#8f8676'
+
 function Diamond({ colour, size = 'h-2.5 w-2.5' }) {
   return <span aria-hidden className={`${size} rotate-45 shrink-0 transition-colors`} style={{ background: colour }} />
 }
 
-function RegionList({ regions, hovered, onHover, onSelect, simple }) {
-  return (
-    <div>
-      <p className="text-[17px] italic text-realm-body mb-5" style={GARAMOND}>
-        {simple ? 'Choose a region to explore its lands.' : 'Choose a region to see its houses and castles.'}
-      </p>
-      <ul className="border-t border-realm-gold/15" onMouseLeave={() => onHover(null)}>
-        {regions.map((r) => (
-          <li key={r.id} className="border-b border-realm-gold/15">
-            <button
-              type="button"
-              onMouseEnter={() => onHover(r.id)}
-              onFocus={() => onHover(r.id)}
-              onBlur={() => onHover(null)}
-              onClick={() => onSelect(r.id)}
-              className={`w-full flex items-center gap-3 px-1 py-2.5 text-left text-[17px] transition-colors ${
-                hovered === r.id ? 'text-realm-cream' : 'text-realm-body'
-              } ${FOCUS}`}
-              style={GARAMOND}
-            >
-              <Diamond colour={hovered === r.id ? r.colour : muted(r.colour)} />
-              {r.name}
-            </button>
-          </li>
-        ))}
-      </ul>
-      {simple && (
-        <Link to="/maps" className={`mt-5 inline-block text-[16px] italic text-realm-gold hover:text-realm-gold-hover ${FOCUS}`} style={GARAMOND}>
-          The realm through the ages
-        </Link>
-      )}
-    </div>
-  )
+/**
+ * Who's in a region this era: houses holding a castle there (the Baratheons
+ * at King's Landing), and the region's own houses that are seated (whose
+ * castles may have no spot on the map, like Driftmark). Exiled and extinct
+ * houses hold nothing, so they're left out. The royal house first, then by
+ * name. `regionCastles` are the region's castles, each with its occupant.
+ */
+function housesInRegion(regionId, houses, regionCastles) {
+  const holdsHere = new Set((regionCastles ?? []).filter((c) => c.occupant).map((c) => surnameKey(c.occupant.name)))
+  const royal = (h) => (h.status ?? '').toLowerCase() === 'royalty'
+  return (houses ?? [])
+    .filter((h) => !holdsNothing(h) && (holdsHere.has(surnameKey(h.name)) || matchesRegion(regionId, h.region)))
+    .sort((a, b) => royal(b) - royal(a) || a.name.localeCompare(b.name))
+}
+
+// The castle a house holds in a region (its chief one, if several), else its first seat.
+function seatInRegion(h, regionCastles) {
+  const rank = { large: 0, medium: 1, small: 2 }
+  const mine = (regionCastles ?? []).filter((c) => c.occupant && surnameKey(c.occupant.name) === surnameKey(h.name))
+  mine.sort((a, b) => rank[a.size] - rank[b.size])
+  return mine[0]?.name ?? seatsOf(h)[0]?.name ?? null
 }
 
 // The panel's groups, top to bottom, by tier. The royal house sits with the
@@ -832,10 +852,134 @@ const TIER_GROUPS = [
   { tier: 'unknown', label: 'Other Houses' },
   { tier: 'order', label: 'Orders' },
 ]
+// Great Houses and Orders (the Night's Watch) get full-width cards; the rest a two-column grid.
+const wide = (tier) => tier === 'great' || tier === 'order'
 const tierGroupOf = (h) => (h.tier === 'vassal' ? 'lordly' : TIER_GROUPS.some((g) => g.tier === h.tier) ? h.tier : 'unknown')
+const tierRank = (h) => TIER_GROUPS.findIndex((g) => g.tier === tierGroupOf(h))
 
+function SectionTitle({ children, right }) {
+  return (
+    <div className="flex items-center gap-3 mb-2.5">
+      <span className="uppercase whitespace-nowrap" style={{ ...CINZEL, fontSize: 10, letterSpacing: '.3em', color: GOLD }}>
+        {children}
+      </span>
+      <span className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(216,184,120,.3), rgba(216,184,120,.04))' }} />
+      {right && (
+        <span className="uppercase whitespace-nowrap" style={{ ...CINZEL, fontSize: 9, letterSpacing: '.2em', color: MUTED }}>
+          {right}
+        </span>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The whole realm: every region as a row in its colour, with who leads it
+ * this era and at which seat, and how many houses it holds. The home page's
+ * small map (`simple`) keeps a plain list: it has no house data.
+ */
+function RegionList({ regions, hovered, onHover, onSelect, simple, summaries }) {
+  if (simple) {
+    return (
+      <div>
+        <p className="text-[17px] italic text-realm-body mb-5" style={GARAMOND}>
+          Choose a region to explore its lands.
+        </p>
+        <ul className="border-t border-realm-gold/15" onMouseLeave={() => onHover(null)}>
+          {regions.map((r) => (
+            <li key={r.id} className="border-b border-realm-gold/15">
+              <button
+                type="button"
+                onMouseEnter={() => onHover(r.id)}
+                onFocus={() => onHover(r.id)}
+                onBlur={() => onHover(null)}
+                onClick={() => onSelect(r.id)}
+                className={`w-full flex items-center gap-3 px-1 py-2.5 text-left text-[17px] transition-colors ${
+                  hovered === r.id ? 'text-realm-cream' : 'text-realm-body'
+                } ${FOCUS}`}
+                style={GARAMOND}
+              >
+                <Diamond colour={hovered === r.id ? r.colour : muted(r.colour)} />
+                {r.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+        <Link to="/maps" className={`mt-5 inline-block text-[16px] italic text-realm-gold hover:text-realm-gold-hover ${FOCUS}`} style={GARAMOND}>
+          The realm through the ages
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-3">
+        <span className="uppercase whitespace-nowrap" style={{ ...CINZEL, fontSize: 10, letterSpacing: '.3em', color: GOLD }}>
+          The Realm
+        </span>
+        <span className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(216,184,120,.3), rgba(216,184,120,.04))' }} />
+        <span className="italic whitespace-nowrap text-[16px]" style={{ ...GARAMOND, color: MUTED }}>
+          Choose a region
+        </span>
+      </div>
+      <ul className="flex flex-col gap-1.5" onMouseLeave={() => onHover(null)}>
+        {regions.map((r) => {
+          const on = hovered === r.id
+          const info = summaries[r.id]
+          return (
+            <li key={r.id}>
+              <button
+                type="button"
+                onMouseEnter={() => onHover(r.id)}
+                onFocus={() => onHover(r.id)}
+                onBlur={() => onHover(null)}
+                onClick={() => onSelect(r.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-[2px] border text-left cursor-pointer transition-colors ${
+                  on ? 'border-[rgba(216,184,120,.5)]' : 'border-[rgba(216,184,120,.12)]'
+                } ${FOCUS}`}
+                style={{ background: `linear-gradient(100deg, ${r.colour}${on ? '40' : '26'} 0%, ${r.colour}08 40%, rgba(255,255,255,.012) 80%)` }}
+              >
+                <Diamond colour={on ? r.colour : muted(r.colour)} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate" style={{ ...CINZEL, fontWeight: 600, fontSize: 14, color: on ? '#f6ecd4' : '#f1e6cc' }}>
+                    {r.name}
+                  </span>
+                  <span className="block truncate italic text-[15px] leading-tight" style={{ ...GARAMOND, color: '#a9a08f' }}>
+                    {info?.lead ?? '\u00a0'}
+                  </span>
+                </span>
+                {info && (
+                  <span className="shrink-0 uppercase whitespace-nowrap" style={{ ...CINZEL, fontSize: 8.5, letterSpacing: '.2em', color: MUTED }}>
+                    {info.count} {info.count === 1 ? 'house' : 'houses'}
+                  </span>
+                )}
+                <span aria-hidden="true" className="shrink-0 text-[15px]" style={{ ...CINZEL, color: GOLD }}>
+                  ›
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+/**
+ * One region: its header card, then its houses by tier. Great Houses and
+ * Orders as large cards with their words, the rest in a two-column grid. Every seat is
+ * a chip; seats on the map select their castle (gliding to its region if
+ * it's elsewhere), seats with no spot on the map are plain. Hovering or
+ * clicking a house lights its castles. Previous / next region at the foot.
+ */
 function RegionPanel({
   region,
+  index,
+  total,
+  prevRegion,
+  nextRegion,
+  onGo,
   kingdom,
   onBack,
   houses,
@@ -849,49 +993,111 @@ function RegionPanel({
   onPinHouse,
   onPickCastle,
 }) {
-  // Houses holding a castle in this region this era.
-  const holdsHere = useMemo(
-    () => new Set((castles ?? []).filter((c) => c.occupant).map((c) => surnameKey(c.occupant.name))),
-    [castles]
-  )
-
-  // Who's here this era: houses holding a castle in the region (the
-  // Baratheons at King's Landing), and the region's own houses that are
-  // seated (whose castles may have no spot on the map, like Driftmark).
-  // Exiled and extinct houses hold nothing, so they're left out.
   const groups = useMemo(() => {
-    const here = (houses ?? []).filter(
-      (h) => !holdsNothing(h) && (holdsHere.has(surnameKey(h.name)) || matchesRegion(region.id, h.region))
-    )
-    const royalFirst = (a, b) =>
-      ((b.status ?? '').toLowerCase() === 'royalty') - ((a.status ?? '').toLowerCase() === 'royalty') || a.name.localeCompare(b.name)
-    return TIER_GROUPS.map((g) => ({ ...g, houses: here.filter((h) => tierGroupOf(h) === g.tier).sort(royalFirst) })).filter(
-      (g) => g.houses.length > 0
-    )
-  }, [houses, region.id, holdsHere])
+    const here = housesInRegion(region.id, houses, castles)
+    return TIER_GROUPS.map((g) => ({ ...g, houses: here.filter((h) => tierGroupOf(h) === g.tier) })).filter((g) => g.houses.length > 0)
+  }, [houses, region.id, castles])
 
   // A seat's castle on the map, if it has one (matched by name or alias).
   const castleFor = (seat) => (allCastles ?? []).find((c) => c.keys.includes(placeKey(seat))) ?? null
 
+  const seatChips = (h, compact) => (
+    <div className={`flex flex-wrap ${compact ? 'gap-x-2.5 gap-y-0.5' : 'gap-1.5 mt-2'}`}>
+      {seatsOf(h).map(({ name }) => {
+        const castle = castleFor(name)
+        const on = castle && pinnedCastle === castle.id
+        if (compact) {
+          return castle ? (
+            <button
+              key={name}
+              type="button"
+              onClick={() => onPickCastle(castle)}
+              className={`text-left italic text-[15px] leading-snug cursor-pointer transition-colors ${on ? 'text-[#eed49b]' : 'text-[#d3c8b2] hover:text-[#eed49b]'} ${FOCUS}`}
+              style={GARAMOND}
+            >
+              {castle.name}
+            </button>
+          ) : (
+            <span key={name} className="italic text-[15px] leading-snug" style={{ ...GARAMOND, color: '#7d7566' }}>
+              {name}
+            </span>
+          )
+        }
+        return castle ? (
+          <button
+            key={name}
+            type="button"
+            onClick={() => onPickCastle(castle)}
+            className={`flex items-center gap-1.5 h-7 px-2.5 rounded-[2px] border italic text-[15px] cursor-pointer transition-colors ${FOCUS}`}
+            style={{
+              ...GARAMOND,
+              background: on ? 'rgba(216,184,120,.16)' : 'rgba(0,0,0,.2)',
+              borderColor: on ? GOLD : 'rgba(216,184,120,.25)',
+              color: on ? '#eed49b' : '#d3c8b2',
+            }}
+          >
+            <span aria-hidden="true" className="w-[5px] h-[5px] rotate-45 shrink-0" style={{ background: GOLD }} />
+            {castle.name}
+          </button>
+        ) : (
+          <span
+            key={name}
+            className="flex items-center gap-1.5 h-7 px-2.5 rounded-[2px] border italic text-[15px]"
+            style={{ ...GARAMOND, borderColor: 'rgba(216,184,120,.12)', color: '#7d7566' }}
+          >
+            <span aria-hidden="true" className="w-[5px] h-[5px] rotate-45 shrink-0 border" style={{ borderColor: 'rgba(216,184,120,.35)' }} />
+            {name}
+          </span>
+        )
+      })}
+    </div>
+  )
+
+  const houseButton = (h, key, lit, children, className) => (
+    <button
+      type="button"
+      aria-pressed={pinnedHouse === key}
+      onClick={() => onPinHouse(key)}
+      onMouseEnter={() => onHoverHouse(key)}
+      onFocus={() => onHoverHouse(key)}
+      onBlur={() => onHoverHouse(null)}
+      className={`text-left cursor-pointer ${FOCUS} ${className}`}
+    >
+      {children}
+    </button>
+  )
+
   return (
     <div>
-      <button
-        type="button"
-        onClick={onBack}
-        className={`text-[15px] italic text-realm-muted hover:text-realm-gold mb-4 ${FOCUS}`}
-        style={GARAMOND}
-      >
-        ← The whole realm
+      <button type="button" onClick={onBack} className={`flex items-center gap-2 text-[16px] italic text-realm-muted hover:text-realm-gold mb-3 ${FOCUS}`} style={GARAMOND}>
+        <span aria-hidden="true">←</span> The whole realm
       </button>
-      <h3 className="flex items-center gap-3 text-[22px] text-realm-cream" style={CINZEL}>
-        <Diamond colour={region.colour} size="h-3 w-3" />
-        {region.name}
-      </h3>
-      {kingdom && (
-        <p className="mt-1.5 text-[15px] italic text-realm-gold" style={GARAMOND}>
-          {kingdom}
-        </p>
-      )}
+
+      {/* Region header card */}
+      <div
+        className="relative overflow-hidden rounded-[2px] border border-[rgba(216,184,120,.25)] px-5 py-4"
+        style={{ background: `linear-gradient(110deg, ${region.colour}55 0%, ${region.colour}14 55%, rgba(255,255,255,.01) 100%)` }}
+      >
+        <span
+          aria-hidden="true"
+          className="absolute right-4 top-1/2 -translate-y-1/2 leading-none pointer-events-none"
+          style={{ ...CINZEL, fontSize: 76, color: 'rgba(255,255,255,.06)' }}
+        >
+          {ROMAN[index]}
+        </span>
+        <div className="relative flex items-center gap-2.5 uppercase" style={{ ...CINZEL, fontSize: 9.5, letterSpacing: '.26em', color: '#d3c8b2' }}>
+          <Diamond colour={region.colour} size="h-2 w-2" />
+          Region {ROMAN[index]} of {ROMAN[total - 1]}
+        </div>
+        <h3 className="relative mt-1.5" style={{ ...CINZEL, fontSize: 25, letterSpacing: '.04em', color: '#f6ecd4' }}>
+          {region.name}
+        </h3>
+        {kingdom && (
+          <p className="relative italic text-[16px]" style={{ ...GARAMOND, color: GOLD }}>
+            {kingdom}
+          </p>
+        )}
+      </div>
 
       <div className="mt-5" onMouseLeave={() => onHoverHouse(null)}>
         {housesError && <p className="text-realm-ember italic" style={GARAMOND}>{housesError}</p>}
@@ -904,76 +1110,97 @@ function RegionPanel({
 
         {groups.map((g) => (
           <section key={g.tier} className="mb-5">
-            <h4 className="mb-1.5 text-[11px] uppercase tracking-[0.28em] text-realm-gold/70" style={CINZEL}>
-              {g.label}
-            </h4>
-            <ul className="border-t border-realm-gold/15">
-              {g.houses.map((h) => {
-                const key = surnameKey(h.name)
-                const lit = litHouse === key
-                // a free-text status ('Diminished') still shows
-                const standing = h.status && !['active', 'royalty'].includes(h.status.toLowerCase()) ? h.status : null
-                return (
-                  <li key={h.id} className={`border-b border-realm-gold/15 py-2.5 transition-colors ${lit ? 'bg-[rgba(216,184,120,.07)]' : ''}`}>
-                    <button
-                      type="button"
-                      aria-pressed={pinnedHouse === key}
-                      onClick={() => onPinHouse(key)}
-                      onMouseEnter={() => onHoverHouse(key)}
-                      onFocus={() => onHoverHouse(key)}
-                      onBlur={() => onHoverHouse(null)}
-                      className={`w-full text-left flex items-center gap-3 px-1 group cursor-pointer ${FOCUS}`}
+            <SectionTitle right={wide(g.tier) ? null : `${g.houses.length} ${g.houses.length === 1 ? 'house' : 'houses'}`}>{g.label}</SectionTitle>
+            {wide(g.tier) ? (
+              <ul className="flex flex-col gap-2">
+                {g.houses.map((h) => {
+                  const key = surnameKey(h.name)
+                  const lit = litHouse === key
+                  const tint = h.tinctFrom ?? '#3a342a'
+                  const standing = h.status && !['active', 'royalty'].includes(h.status.toLowerCase()) ? h.status : null
+                  return (
+                    <li
+                      key={h.id}
+                      className={`flex gap-3.5 px-3.5 py-3 rounded-[2px] border transition-colors ${lit ? 'border-[rgba(216,184,120,.6)]' : 'border-[rgba(216,184,120,.2)]'}`}
+                      style={{ background: `linear-gradient(100deg, ${tint}66 0%, ${tint}1c 50%, rgba(255,255,255,.01) 100%)` }}
                     >
-                      <img src={h.imageUrl || `/houses/sigils/${h.slug}.svg`} alt="" className="h-9 w-9 object-contain shrink-0" loading="lazy" />
-                      <span className="min-w-0">
-                        <span
-                          className={`block text-[17px] transition-colors ${lit ? 'text-realm-gold' : 'text-realm-ink group-hover:text-realm-gold'}`}
-                          style={GARAMOND}
-                        >
-                          {h.name}
-                        </span>
+                      {houseButton(h, key, lit, <HouseBanner house={h} width={40} />, 'shrink-0 self-start')}
+                      <div className="min-w-0">
+                        {houseButton(
+                          h,
+                          key,
+                          lit,
+                          <>
+                            <span className="block" style={{ ...CINZEL, fontWeight: 600, fontSize: 16, color: lit ? '#eed49b' : '#f6ecd4' }}>
+                              {h.name}
+                            </span>
+                            <span className="block italic text-[16px] leading-snug" style={{ ...GARAMOND, color: h.words ? '#d9ccb0' : '#8a5a4e' }}>
+                              {standing ?? (h.words ? h.words : 'No recorded words')}
+                            </span>
+                          </>,
+                          'block'
+                        )}
+                        {seatChips(h, false)}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              <ul className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-1.5">
+                {g.houses.map((h) => {
+                  const key = surnameKey(h.name)
+                  const lit = litHouse === key
+                  const tint = h.tinctFrom ?? '#3a342a'
+                  const standing = h.status && !['active', 'royalty'].includes(h.status.toLowerCase()) ? h.status : null
+                  return (
+                    <li
+                      key={h.id}
+                      className={`flex gap-2.5 px-2.5 py-2 rounded-[2px] border transition-colors ${lit ? 'border-[rgba(216,184,120,.55)]' : 'border-[rgba(216,184,120,.12)]'}`}
+                      style={{ background: `linear-gradient(100deg, ${tint}33 0%, ${tint}0a 50%, transparent)` }}
+                    >
+                      {houseButton(h, key, lit, <HouseBanner house={h} width={24} />, 'shrink-0 self-start mt-0.5')}
+                      <div className="min-w-0">
+                        {houseButton(
+                          h,
+                          key,
+                          lit,
+                          <span className="block truncate" style={{ ...CINZEL, fontWeight: 600, fontSize: 12.5, color: lit ? '#eed49b' : '#f1e6cc' }}>
+                            {h.name}
+                          </span>,
+                          'block max-w-full'
+                        )}
                         {standing && (
-                          <span className="block text-[14px] italic text-realm-muted" style={GARAMOND}>
+                          <span className="block italic text-[14px]" style={{ ...GARAMOND, color: MUTED }}>
                             {standing}
                           </span>
                         )}
-                      </span>
-                    </button>
-
-                    {/* every seat, main seat first; seats on the map take you to their castle */}
-                    <ul className="mt-1 ml-[52px] flex flex-col">
-                      {seatsOf(h).map(({ name }) => {
-                        const castle = castleFor(name)
-                        const on = castle && pinnedCastle === castle.id
-                        return (
-                          <li key={name}>
-                            {castle ? (
-                              <button
-                                type="button"
-                                onClick={() => onPickCastle(castle)}
-                                className={`flex items-center gap-2 py-0.5 text-[14px] italic transition-colors cursor-pointer ${
-                                  on ? 'text-realm-gold' : 'text-realm-muted hover:text-realm-gold'
-                                } ${FOCUS}`}
-                                style={GARAMOND}
-                              >
-                                <span aria-hidden="true" className={`w-[5px] h-[5px] rotate-45 shrink-0 ${on ? 'bg-realm-gold' : 'bg-realm-gold/45'}`} />
-                                {castle.name}
-                              </button>
-                            ) : (
-                              <span className="flex items-center gap-2 py-0.5 text-[14px] italic text-realm-faint" style={GARAMOND}>
-                                <span aria-hidden="true" className="w-[5px] h-[5px] rotate-45 shrink-0 border border-realm-gold/30" />
-                                {name}
-                              </span>
-                            )}
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  </li>
-                )
-              })}
-            </ul>
+                        {seatChips(h, true)}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
           </section>
+        ))}
+      </div>
+
+      {/* Previous / next region */}
+      <div className="flex items-center justify-between gap-3 mt-2 pt-3 border-t border-[rgba(216,184,120,.14)]">
+        {[
+          { r: prevRegion, dir: -1 },
+          { r: nextRegion, dir: 1 },
+        ].map(({ r, dir }) => (
+          <button
+            key={dir}
+            type="button"
+            onClick={() => onGo(r.id)}
+            className={`uppercase cursor-pointer hover:text-[#eed49b] transition-colors ${FOCUS}`}
+            style={{ ...CINZEL, fontSize: 9.5, letterSpacing: '.2em', color: '#b8ad98' }}
+          >
+            {dir < 0 ? `\u2039 ${r.name}` : `${r.name} \u203a`}
+          </button>
         ))}
       </div>
     </div>

@@ -2,6 +2,8 @@ import { useState, useMemo, useCallback } from 'react'
 import PageWrapper from '../../../components/PageWrapper'
 import { fetchDraftablePool } from '../../../lib/characterAttributesService'
 import { ROLES } from '../../../data/roleWeights'
+import DraftScreen from '../../../components/draft/DraftScreen'
+import CourtSeated from '../../../components/draft/CourtSeated'
 import {
   createDraftState,
   offerCharacters,
@@ -9,11 +11,6 @@ import {
   isDraftComplete,
   getFinalRoster,
 } from '../../../gameEngine/draftEngine'
-import RoleGrid from './RoleGrid'
-import DraftBoard from './DraftBoard'
-import DraftOathModal from './DraftOathModal'
-import DraftLedger from './DraftLedger'
-import Roster from './Roster'
 import DraftIntro from './DraftIntro'
 import { recordGameEvent } from '../../../lib/recordSync'
 
@@ -32,7 +29,7 @@ export default function Draft() {
   const [houseName, setHouseName] = useState('')
   const [draftState, setDraftState] = useState(null)
   const [selectedCharacter, setSelectedCharacter] = useState(null)
-  // The role the player targeted (by clicking an open seat in RoleGrid)
+  // The role the player targeted (by clicking an open seat in the council)
   // for the currently selected character — holds the pick open behind
   // the Take Oath confirmation modal until they confirm or reconsider.
   // Nothing is committed to draftState until handleConfirmOath runs.
@@ -72,7 +69,7 @@ export default function Draft() {
   }, [])
 
   // Step 1 of committing a pick: the player has a character selected and
-  // taps an open seat in RoleGrid. This doesn't touch draftState — it
+  // taps an open seat in the council. This doesn't touch draftState — it
   // just opens the Take Oath modal. Nothing is drafted until confirmed.
   const handleRequestAssign = useCallback(
     (roleId) => {
@@ -89,7 +86,7 @@ export default function Draft() {
   // Step 2: the player confirms in the modal. This is the only place that
   // actually calls draftEngine.assignRole — same call, same engine, just
   // gated behind the confirmation step instead of firing straight off the
-  // RoleGrid click like before.
+  // council click like before.
   const handleConfirmOath = useCallback(() => {
     if (!selectedCharacter || !pendingRoleId) return
     try {
@@ -176,116 +173,34 @@ export default function Draft() {
     const roster = getFinalRoster(draftState)
     return (
       <PageWrapper className="justify-start">
-        <Roster roster={roster} houseName={houseName} />
-        <div className="w-full max-w-sm pb-4">
-          <button
-            onClick={handlePlayAgain}
-            className="w-full py-4 rounded border border-got-gold bg-got-gold/10 text-got-gold text-lg tracking-widest uppercase transition-all duration-200 hover:bg-got-gold/20 active:scale-[0.98]"
-            style={{ fontFamily: 'Cinzel, serif' }}
-          >
-            Draft Again
+        <CourtSeated roster={roster} houseName={houseName}>
+          <button type="button" onClick={handlePlayAgain} className="dr-btn-gold">
+            Draft again
           </button>
-        </div>
+        </CourtSeated>
       </PageWrapper>
     )
   }
 
   // status === 'drafting'
-  const filledCount = Object.values(draftState.roleAssignments).filter(Boolean).length
-  const filledEntries = Object.values(draftState.roleAssignments).filter(Boolean)
-  const overallFit =
-    filledEntries.length > 0
-      ? Math.round(filledEntries.reduce((sum, c) => sum + c.fit, 0) / filledEntries.length)
-      : null
   const pendingRole = pendingRoleId ? ROLES.find((r) => r.id === pendingRoleId) : null
 
   return (
     <PageWrapper className="justify-start">
-      <div className="w-full max-w-5xl flex flex-col gap-6 pt-2 pb-4">
-        {/* House progress header */}
-        <div className="border-b border-stone-800 pb-4">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <p
-                className="text-got-parchment/40 text-xs tracking-[0.3em] uppercase"
-                style={{ fontFamily: 'Cinzel, serif' }}
-              >
-                The Draft
-              </p>
-              <h1 className="text-got-parchment text-xl font-semibold mt-1" style={{ fontFamily: 'Cinzel, serif' }}>
-                House {houseName}
-              </h1>
-            </div>
-            {overallFit !== null && (
-              <div className="text-right">
-                <p
-                  className="text-got-parchment/40 text-xs tracking-[0.24em] uppercase"
-                  style={{ fontFamily: 'Cinzel, serif' }}
-                >
-                  Overall
-                </p>
-                <p className="text-got-gold text-2xl font-bold" style={{ fontFamily: 'Cinzel, serif' }}>
-                  {overallFit}
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-1 mt-4">
-            {ROLES.map((role) => (
-              <div
-                key={role.id}
-                title={role.label}
-                className={[
-                  'flex-1 h-[3px] rounded-full',
-                  draftState.roleAssignments[role.id] ? 'bg-got-gold' : 'bg-stone-800',
-                ].join(' ')}
-              />
-            ))}
-          </div>
-          <div
-            className="flex justify-between mt-2 text-[11px] tracking-[0.2em] uppercase text-stone-500"
-            style={{ fontFamily: 'Cinzel, serif' }}
-          >
-            <span>{filledCount} Sworn</span>
-            <span>{ROLES.length - filledCount} Seats Remain</span>
-          </div>
-        </div>
-
-        {/* Main content: pick list / ledger, plus council sidebar */}
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-          <div className="flex-1 min-w-0 w-full">
-            {justSworn ? (
-              <DraftLedger
-                role={justSworn.role}
-                character={justSworn.character}
-                isFinal={isDraftComplete(draftState)}
-                onContinue={handleDismissLedger}
-              />
-            ) : (
-              <DraftBoard
-                round={draftState.round}
-                offer={offer}
-                selectedCharacterId={selectedCharacter?.id ?? null}
-                onSelect={handleSelectCharacter}
-              />
-            )}
-          </div>
-
-          <aside className="w-full lg:w-[360px] lg:flex-none">
-            <RoleGrid draftState={draftState} selectedCharacter={selectedCharacter} onAssign={handleRequestAssign} />
-          </aside>
-        </div>
-      </div>
-
-      {pendingRole && selectedCharacter && (
-        <DraftOathModal
-          role={pendingRole}
-          character={selectedCharacter}
-          onConfirm={handleConfirmOath}
-          onCancel={handleCancelOath}
-        />
-      )}
+      <DraftScreen
+        houseName={houseName}
+        draftState={draftState}
+        isComplete={isDraftComplete(draftState)}
+        offer={offer}
+        selectedCharacter={selectedCharacter}
+        onSelect={handleSelectCharacter}
+        onRequestAssign={handleRequestAssign}
+        justSworn={justSworn}
+        onContinue={handleDismissLedger}
+        pendingRole={pendingRole}
+        onConfirm={handleConfirmOath}
+        onCancel={handleCancelOath}
+      />
     </PageWrapper>
   )
 }

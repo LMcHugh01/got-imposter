@@ -9,6 +9,7 @@ import Games from './pages/Games'
 import About from './pages/about/About'
 import Characters from './pages/characters/Characters'
 import Houses from './pages/houses/Houses'
+import House from './pages/houses/House'
 import Privacy from './pages/Privacy'
 import Maps from './pages/maps/Maps'
 
@@ -54,6 +55,7 @@ function AppRoutes() {
           <Route path="/about" element={<About />} />
           <Route path="/characters" element={<Characters />} />
           <Route path="/houses" element={<Houses />} />
+          <Route path="/houses/:slug" element={<House />} />
           <Route path="/maps" element={<Maps />} />
           <Route path="/privacy" element={<Privacy />} />
 

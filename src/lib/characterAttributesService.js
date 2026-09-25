@@ -80,7 +80,7 @@ export async function fetchDraftablePool() {
   const { data, error } = await supabase.from('character_attributes').select(`
     character_id,
     ${SELECT_COLUMNS},
-    characters ( name, house, fighting_style, leadership_style, command_style, coin_style )
+characters ( name, house, image_url, fighting_style, leadership_style, command_style, coin_style )
   `)
 
   if (error) {
@@ -146,7 +146,7 @@ export async function fetchAllCharactersForBrowse() {
       id: row.api_id,
       name: row.name,
       house: row.house,
-      image_url: row.image_url,
+      image_url: row.characters.image_url,
       attributes: mapAttributeRow(attrRow),
       hasAttributes: Boolean(attrRow),
       fightingStyle: mapFightingStyle(row.fighting_style),
