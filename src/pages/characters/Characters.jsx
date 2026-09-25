@@ -347,9 +347,6 @@ export default function Characters() {
   }
 
   const rankLabel = activeRole ? activeRole.label : 'Overall'
-  const rankHint = activeRole
-    ? 'Weighted against this seat\u2019s key attributes.'
-    : 'Each character scored at the council seat that suits them best.'
 
   const styleCount = (value) => base.filter((c) => c[styleGroup.key] === value).length
   const styleTabs = [{ value: 'all', label: 'All', count: base.length }].concat(
@@ -371,9 +368,6 @@ export default function Characters() {
             <h1 className="mt-2 leading-none" style={{ ...CINZEL, fontWeight: 500, fontSize: 40, letterSpacing: '.1em', color: INK.cream }}>
               Characters
             </h1>
-            <p className="mt-2.5 text-[18px] italic text-pretty" style={{ ...GARAMOND, color: '#b8ad98' }}>
-              The people of Westeros, and how they rate for each seat on the council.
-            </p>
           </div>
           {podium.length > 0 && (
             <ol className="hidden md:flex border-b border-[rgba(216,184,120,.25)] pb-3" aria-label={`Top three, ${rankLabel}`}>
@@ -402,9 +396,6 @@ export default function Characters() {
             <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 min-w-0">
               <Label style={{ fontSize: 9.5, letterSpacing: '.34em' }}>Ranked by</Label>
               <span style={{ ...CINZEL, fontWeight: 600, fontSize: 20, color: INK.cream }}>{rankLabel}</span>
-              <span className="italic text-[17px]" style={{ ...GARAMOND, color: '#a9a08f' }}>
-                {rankHint}
-              </span>
             </div>
             <span className="uppercase" style={{ ...CINZEL, fontSize: 10, letterSpacing: '.24em', color: INK.muted }}>
               {sorted.length} of {rows.length}
